@@ -20,8 +20,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // Convertir payload.sub explícitamente a BigInt para la consulta de Prisma
     const usuario = await this.prisma.usuario.findUnique({
-      where: { id_usuario: payload.sub },
+      where: { id_usuario: BigInt(payload.sub) },
     });
 
     if (!usuario || usuario.estado === 'INACTIVO') {
