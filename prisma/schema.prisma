@@ -1,13 +1,138 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model cobro {
+  id_cobro          BigInt    @id(map: "cobros_pkey") @default(autoincrement())
+  id_contrato       BigInt?
+  id_concepto       Int?      @db.SmallInt
+  descripcion       String?   @db.VarChar(255)
+  monto             Decimal?  @db.Decimal(12, 2)
+  moneda            String?   @db.VarChar(3)
+  periodo_mes       Int?
+  periodo_anio      Int?
+  fecha_emision     DateTime? @db.Date
+  fecha_vencimiento DateTime? @db.Date
+  estado            String?   @db.VarChar(15)
+  created_date      DateTime? @default(now()) @db.Timestamp(6)
+  updated_date      DateTime? @db.Time(6)
+}
+
+model concepto {
+  id_concepto  Int       @id @default(autoincrement())
+  nombre       String?   @db.VarChar(50)
+  descripcion  String?   @db.VarChar(255)
+  recurrente   String?   @db.VarChar(15)
+  estado       String?   @db.VarChar(20)
+  created_date DateTime? @default(now()) @db.Timestamp(6)
+  updated_date DateTime? @db.Timestamp(6)
+}
+
+model contrato {
+  id_contrato     BigInt                    @id @default(autoincrement())
+  id_departamento BigInt?
+  id_usuario      BigInt?
+  fecha_inicio    DateTime?                 @db.Date
+  fecha_fin       DateTime?                 @db.Date
+  monto_renta     Decimal?                  @db.Decimal(12, 2)
+  moneda          String?                   @db.VarChar(5)
+  garantia        Decimal?                  @db.Decimal(12, 2)
+  dia_limite      Unsupported("daterange")?
+  estado          String?                   @db.VarChar(20)
+  created_date    DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_date    DateTime?                 @db.Timestamp(6)
+}
+
+model departamento {
+  id_departamento     BigInt    @id @default(autoincrement())
+  id_edificio         Int?
+  numero_departamento String?   @db.VarChar(30)
+  medidor_agua        String?   @db.VarChar(20)
+  medidor_luz         String?   @db.VarChar(20)
+  estado              String?   @db.VarChar(25)
+  created_date        DateTime? @default(now()) @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  piso                Int?
+  habitaciones        Int?
+  banos               Int?      
+  precio_alquiler     Decimal?  @db.Decimal(12, 4)
+  observaciones       String?   @db.Text
+}
+
+model edificio {
+  id_edificio  Int       @id @default(autoincrement())
+  nombre       String?   @db.VarChar(100)
+  direccion    String?
+  total_pisos  Int?
+  estado       String?   @db.VarChar(15)
+  created_date DateTime? @default(now()) @db.Timestamp(6)
+  updated_date DateTime? @db.Timestamp(6)
+}
+
+model pago {
+  id_pago         BigInt    @id @default(autoincrement())
+  id_cobro        BigInt?
+  id_usuario      BigInt?
+  monto_pagado    Decimal?  @db.Decimal(12, 2)
+  moneda          String?   @db.VarChar(3)
+  tipo_cambio     Decimal?  @db.Decimal(8, 4)
+  metodo_pago     String?   @db.VarChar(50)
+  num_transaccion String?   @db.VarChar(100)
+  comprobante     String?
+  fecha_pago      DateTime? @default(now()) @db.Timestamp(6)
+  observaciones   String?
+  estado          String?   @db.VarChar(15)
+  created_date    DateTime? @default(now()) @db.Timestamp(6)
+  updated_date    DateTime? @db.Timestamp(6)
+}
+
+model refaccion {
+  id_refaccion    BigInt    @id @default(autoincrement())
+  id_edificio     Int?
+  id_departamento BigInt?
+  id_usuario      BigInt?
+  titulo          String?   @db.VarChar(150)
+  descripcion     String?
+  tipo            String?   @db.VarChar(50)
+  prioridad       String?   @db.VarChar(20)
+  costo_estimado  Decimal?  @db.Decimal(12, 4)
+  costo_real      Decimal?  @db.Decimal(12, 4)
+  moneda          String?   @db.VarChar(3)
+  proveedor       String?   @db.VarChar(150)
+  fecha_solicitud DateTime? @db.Date
+  fecha_inicio    DateTime? @db.Date
+  fecha_fin       DateTime? @db.Date
+  estado          String?   @db.VarChar(20)
+  created_date    DateTime? @default(now()) @db.Timestamp(6)
+  updated_date    DateTime? @db.Timestamp(6)
+}
+
+model usuario {
+  id_usuario       BigInt    @id @default(autoincrement())
+  nombre           String?   @db.VarChar(100)
+  primer_apellido  String?   @db.VarChar(100)
+  segundo_apellido String?   @db.VarChar(100)
+  ci_nit           String?   @db.VarChar(20)
+  email            String?   @db.VarChar(150)
+  telefono         String?   @db.VarChar(20)
+  password         String?   @db.VarChar(255)
+  rol              Int?      @db.SmallInt
+  estado           String?   @db.VarChar(20)
+  created_date     DateTime? @default(now()) @db.Timestamp(6)
+  updated_date     DateTime? @db.Timestamp(6)
+}
+
+model usuario_edificio {
+  id_usuario_edificio BigInt    @id @default(autoincrement())
+  id_usuario          BigInt?
+  id_edificio         Int?
+  fecha_asignacion    DateTime? @db.Date
+  estado              String?   @db.VarChar(15)
+  created_date        DateTime? @default(now()) @db.Timestamp(6)
+  updated_date        DateTime? @db.Time(6)
 }
