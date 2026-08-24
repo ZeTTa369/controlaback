@@ -7,18 +7,28 @@ import { Prisma } from '@prisma/client';
 export class ContratosService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Parsear 'YYYY-MM-DD' en hora local para evitar desfases UTC
+  private parseFechaLocal(fechaStr: string | Date): Date {
+    if (fechaStr instanceof Date) return fechaStr;
+    const [year, month, day] = fechaStr.split('-').map(Number);
+    return new Date(year, month - 1, day || 1);
+  }
+
   async create(dto: CreateContratoDto) {
+    const fInicio = this.parseFechaLocal(dto.fecha_inicio);
+    const fFin = this.parseFechaLocal(dto.fecha_fin);
+
     // 1. Crear el contrato
     const contrato = await this.prisma.contrato.create({
       data: {
         id_departamento: BigInt(dto.id_departamento),
         id_usuario: BigInt(dto.id_usuario),
-        fecha_inicio: new Date(dto.fecha_inicio),
-        fecha_fin: new Date(dto.fecha_fin),
+        fecha_inicio: fInicio,
+        fecha_fin: fFin,
         monto_renta: new Prisma.Decimal(dto.monto_renta.toString()),
         moneda: dto.moneda || 'BOB',
         garantia: dto.garantia ? new Prisma.Decimal(dto.garantia.toString()) : new Prisma.Decimal('0'),
-        estado: 'ACTIVO',
+        estado: dto.estado || 'ACTIVO',
       },
     });
 
@@ -31,8 +41,8 @@ export class ContratosService {
     // 3. Generar automáticamente TODOS los cobros multiplicando (meses x conceptos)
     await this.generarCobrosAutomaticos(
       contrato.id_contrato,
-      new Date(dto.fecha_inicio),
-      new Date(dto.fecha_fin),
+      fInicio,
+      fFin,
       dto.monto_renta,
       dto.moneda || 'BOB',
       dto.conceptosIds || [1],
@@ -56,8 +66,8 @@ export class ContratosService {
       },
     });
 
-    // Mapa para resolución rápida de nombres y montos sugeridos
-    const mapaConceptos = new Map<number, { nombre: string; montoBase?: number }>();
+    // Mapa para resolución rápida de nombres
+    const mapaConceptos = new Map<number, { nombre: string }>();
     conceptosInfo.forEach((c) => {
       mapaConceptos.set(c.id_concepto, {
         nombre: c.nombre || 'Concepto',
@@ -76,7 +86,7 @@ export class ContratosService {
 
     const cobrosData: Prisma.cobroCreateManyInput[] = [];
 
-    // 3. Iterar mes a mes usando timestamp base para evitar desfases por días de mes
+    // 3. Iterar mes a mes usando año y mes base del inicio
     for (let i = 0; i < mesesDiferencia; i++) {
       const fechaActual = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + i, 1);
       const mes = fechaActual.getMonth() + 1;
@@ -91,13 +101,12 @@ export class ContratosService {
         const concepto = mapaConceptos.get(idConceptoNum);
         const nombreConcepto = concepto?.nombre || 'Cobro de Alquiler';
 
-        // Asignar montoRenta al concepto de RENTA/ALQUILER y un monto predeterminado razonable si es expensas/otros
         const esRenta =
           nombreConcepto.toUpperCase().includes('RENTA') ||
           nombreConcepto.toUpperCase().includes('ALQUILER') ||
           idConceptoNum === 1;
 
-        const montoFinal = esRenta ? montoRenta : 150; // Ajustable según el concepto
+        const montoFinal = esRenta ? montoRenta : 150;
 
         cobrosData.push({
           id_contrato,

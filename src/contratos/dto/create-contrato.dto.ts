@@ -29,6 +29,10 @@ export class CreateContratoDto {
   @IsOptional()
   garantia?: number;
 
+  @IsOptional()
+  @IsString()
+  estado?: string;
+
   @IsArray()
   @IsNumber({}, { each: true })
   conceptosIds: number[]; // Conceptos asociados (Renta, Expensas, Mantenimiento)
