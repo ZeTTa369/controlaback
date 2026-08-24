@@ -48,6 +48,7 @@ export class AuthService {
 
     if (!isPasswordValid) {
       this.logger.error(`Contraseña incorrecta para el usuario: ${emailLimpio}`);
+      
       throw new UnauthorizedException('Credenciales incorrectas');
     }
 
