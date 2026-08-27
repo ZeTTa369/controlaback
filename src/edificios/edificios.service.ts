@@ -15,14 +15,14 @@ export class EdificiosService {
       data: {
         nombre: dto.nombre,
         direccion: dto.direccion,
-        total_pisos: dto.total_pisos || 1,
+        total_departamentos: dto.total_departamentos || 1,
         estado: dto.estado || 'ACTIVO',
       },
     });
   }
 
   /**
-   * Listar todos los edificios (sin include)
+   * Listar todos los edificios
    */
   async findAll() {
     const edificios = await this.prisma.edificio.findMany({
@@ -31,13 +31,13 @@ export class EdificiosService {
 
     return edificios.map((ed) => ({
       ...ed,
-      total_departamentos: ed.total_pisos || 0,
-      unidades_disponibles: ed.total_pisos || 0,
+      total_departamentos: ed.total_departamentos || 0,
+      unidades_disponibles: ed.total_departamentos || 0,
     }));
   }
 
   /**
-   * Buscar un edificio por su ID (sin include)
+   * Buscar un edificio por su ID
    */
   async findOne(id: number) {
     const edificio = await this.prisma.edificio.findUnique({
@@ -50,13 +50,13 @@ export class EdificiosService {
 
     return {
       ...edificio,
-      total_departamentos: edificio.total_pisos || 0,
-      unidades_disponibles: edificio.total_pisos || 0,
+      total_departamentos: edificio.total_departamentos || 0,
+      unidades_disponibles: edificio.total_departamentos || 0,
     };
   }
 
   /**
-   * Actualizar un edificio existente (sin include)
+   * Actualizar un edificio existente
    */
   async update(id: number, dto: UpdateEdificioDto) {
     await this.findOne(id);
@@ -66,7 +66,7 @@ export class EdificiosService {
       data: {
         ...(dto.nombre && { nombre: dto.nombre }),
         ...(dto.direccion && { direccion: dto.direccion }),
-        ...(dto.total_pisos !== undefined && { total_pisos: dto.total_pisos }),
+        ...(dto.total_departamentos !== undefined && { total_departamentos: dto.total_departamentos }),
         ...(dto.estado && { estado: dto.estado }),
         updated_date: new Date(),
       },
@@ -74,8 +74,8 @@ export class EdificiosService {
 
     return {
       ...edificioActualizado,
-      total_departamentos: edificioActualizado.total_pisos || 0,
-      unidades_disponibles: edificioActualizado.total_pisos || 0,
+      total_departamentos: edificioActualizado.total_departamentos || 0,
+      unidades_disponibles: edificioActualizado.total_departamentos || 0,
     };
   }
 

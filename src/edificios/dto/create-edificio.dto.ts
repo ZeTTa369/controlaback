@@ -11,7 +11,7 @@ export class CreateEdificioDto {
 
   @IsNumber()
   @IsOptional()
-  total_pisos?: number;
+  total_departamentos?: number;
 
   @IsString()
   @IsOptional()
