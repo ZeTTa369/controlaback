@@ -69,7 +69,7 @@ model departamento {
 model edificio {
   id_edificio         Int            @id @default(autoincrement())
   nombre              String?        @db.VarChar(150)
-  direccion           String?        @db.VarChar(255)
+  direccion           String?        
   ciudad              String?        @db.VarChar(100)
   provincia           String?        @db.VarChar(100)
   imagen              String?
