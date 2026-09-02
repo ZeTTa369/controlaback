@@ -1,43 +1,56 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { 
+  IsNotEmpty, 
+  IsNumber, 
+  IsOptional, 
+  IsString 
+} from 'class-validator';
 
 export class CreateDepartamentoDto {
+  @IsNotEmpty({ message: 'El edificio es obligatorio' })
   @IsNumber()
-  @IsNotEmpty()
   id_edificio: number;
 
-  @IsString()
-  @IsNotEmpty()
-  numero_departamento: string;
-
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   piso?: number;
 
-  @IsNumber()
+  @IsNotEmpty({ message: 'El número o identificador del departamento es obligatorio' })
+  @IsString()
+  numero_departamento: string;
+
   @IsOptional()
+  @IsString()
+  bloque?: string; // 'FRONTAL' o 'TRASERO'
+
+  @IsOptional()
+  @IsString()
+  medidor_agua?: string; // 'INDEPENDIENTE', 'COMPARTIDO' o 'NO_TIENE'
+
+  @IsOptional()
+  @IsString()
+  medidor_luz?: string; // 'INDEPENDIENTE', 'COMPARTIDO' o 'NO_TIENE'
+
+  @IsOptional()
+  @IsString()
+  tipo_inmueble?: string; // 'DEPARTAMENTO', 'MONOAMBIENTE', 'CUARTO', 'GARZONIER', 'GALERIA_TIENDA'
+
+  @IsOptional()
+  @IsString()
+  estado?: string; // 'DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO'
+
+  @IsOptional()
+  @IsNumber()
   habitaciones?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   banos?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   precio_alquiler?: number;
 
-  @IsString()
   @IsOptional()
-  medidor_agua?: string;
-
   @IsString()
-  @IsOptional()
-  medidor_luz?: string;
-
-  @IsString()
-  @IsOptional()
   observaciones?: string;
-
-  @IsString()
-  @IsOptional()
-  estado?: string;
 }

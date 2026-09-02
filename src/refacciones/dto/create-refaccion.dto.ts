@@ -1,47 +1,73 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { 
+  IsNotEmpty, 
+  IsNumber, 
+  IsOptional, 
+  IsString, 
+  IsDateString 
+} from 'class-validator';
 
 export class CreateRefaccionDto {
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   id_edificio?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   id_departamento?: number;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  id_usuario: number; // Quien reporta o asigna
+  id_usuario?: number;
 
+  @IsNotEmpty({ message: 'El título de la refacción es obligatorio' })
   @IsString()
-  @IsNotEmpty()
   titulo: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  descripcion: string;
+  descripcion?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  tipo: string; // AREA_COMUN, DEPARTAMENTO, ESTRUCTURAL
+  tipo?: string; // Ej: 'PLOMERIA', 'ELECTRICIDAD', 'PINTURA', 'ESTRUCTURAL', 'GENERAL'
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  prioridad: string; // ALTA, MEDIA, BAJA
+  prioridad?: string; // 'BAJA', 'MEDIA', 'ALTA', 'URGENTE'
 
+  @IsOptional()
   @IsNumber()
-  @IsOptional()
-  costo_estimado?: number;
+  costo_mano_obra?: number;
 
-  @IsString()
   @IsOptional()
-  moneda?: string = 'BOB';
+  @IsNumber()
+  costo_material?: number;
 
-  @IsString()
   @IsOptional()
+  @IsNumber()
+  costo_total?: number;
+
+  @IsOptional()
+  @IsString()
+  moneda?: string; // 'BOB' o 'USD'
+
+  @IsOptional()
+  @IsString()
   proveedor?: string;
 
-  @IsDateString()
   @IsOptional()
+  @IsDateString()
   fecha_solicitud?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fecha_inicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fecha_fin?: string;
+
+  @IsOptional()
+  @IsString()
+  estado?: string; // 'PENDIENTE', 'EN_PROCESO', 'COMPLETADO', 'CANCELADO'
 }
