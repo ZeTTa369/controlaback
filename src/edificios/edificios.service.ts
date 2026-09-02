@@ -8,32 +8,65 @@ export class EdificiosService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Helper para computar estadísticas de departamentos por edificio
+   */
+  private async getMetricasEdificio(edificio: any) {
+    const deptos = await this.prisma.departamento.findMany({
+      where: { id_edificio: edificio.id_edificio },
+      select: { estado: true },
+    });
+
+    const totalRegistrados = deptos.length;
+    const disponibles = deptos.filter(
+      (d) => (d.estado || 'DISPONIBLE').toUpperCase() === 'DISPONIBLE',
+    ).length;
+    const ocupados = deptos.filter(
+      (d) => (d.estado || '').toUpperCase() === 'OCUPADO',
+    ).length;
+    const mantenimiento = deptos.filter(
+      (d) => (d.estado || '').toUpperCase() === 'MANTENIMIENTO',
+    ).length;
+
+    return {
+      ...edificio,
+      ciudad: edificio.ciudad || '',
+      provincia: edificio.provincia || '',
+      capacidad_declarada: edificio.total_departamentos || 0,
+      total_registrados: totalRegistrados,
+      disponibles: disponibles,
+      ocupados: ocupados,
+      mantenimiento: mantenimiento,
+    };
+  }
+
+  /**
    * Crear un nuevo edificio
    */
   async create(dto: CreateEdificioDto) {
-    return this.prisma.edificio.create({
+    const edificio = await this.prisma.edificio.create({
       data: {
-        nombre: dto.nombre,
-        direccion: dto.direccion,
+        nombre: dto.nombre.trim(),
+        direccion: dto.direccion.trim(),
+        ciudad: dto.ciudad?.trim() || null,
+        provincia: dto.provincia?.trim() || null,
+        imagen: dto.imagen || null,
         total_departamentos: dto.total_departamentos || 1,
         estado: dto.estado || 'ACTIVO',
       },
     });
+
+    return this.getMetricasEdificio(edificio);
   }
 
   /**
-   * Listar todos los edificios
+   * Listar todos los edificios con métricas calculadas
    */
   async findAll() {
     const edificios = await this.prisma.edificio.findMany({
       orderBy: { created_date: 'desc' },
     });
 
-    return edificios.map((ed) => ({
-      ...ed,
-      total_departamentos: ed.total_departamentos || 0,
-      unidades_disponibles: ed.total_departamentos || 0,
-    }));
+    return Promise.all(edificios.map((ed) => this.getMetricasEdificio(ed)));
   }
 
   /**
@@ -48,11 +81,7 @@ export class EdificiosService {
       throw new NotFoundException(`Edificio con ID ${id} no encontrado`);
     }
 
-    return {
-      ...edificio,
-      total_departamentos: edificio.total_departamentos || 0,
-      unidades_disponibles: edificio.total_departamentos || 0,
-    };
+    return this.getMetricasEdificio(edificio);
   }
 
   /**
@@ -64,19 +93,20 @@ export class EdificiosService {
     const edificioActualizado = await this.prisma.edificio.update({
       where: { id_edificio: id },
       data: {
-        ...(dto.nombre && { nombre: dto.nombre }),
-        ...(dto.direccion && { direccion: dto.direccion }),
-        ...(dto.total_departamentos !== undefined && { total_departamentos: dto.total_departamentos }),
+        ...(dto.nombre && { nombre: dto.nombre.trim() }),
+        ...(dto.direccion && { direccion: dto.direccion.trim() }),
+        ...(dto.ciudad !== undefined && { ciudad: dto.ciudad?.trim() || null }),
+        ...(dto.provincia !== undefined && { provincia: dto.provincia?.trim() || null }),
+        ...(dto.imagen !== undefined && { imagen: dto.imagen }),
+        ...(dto.total_departamentos !== undefined && {
+          total_departamentos: dto.total_departamentos,
+        }),
         ...(dto.estado && { estado: dto.estado }),
         updated_date: new Date(),
       },
     });
 
-    return {
-      ...edificioActualizado,
-      total_departamentos: edificioActualizado.total_departamentos || 0,
-      unidades_disponibles: edificioActualizado.total_departamentos || 0,
-    };
+    return this.getMetricasEdificio(edificioActualizado);
   }
 
   /**
@@ -84,8 +114,9 @@ export class EdificiosService {
    */
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.edificio.delete({
+    await this.prisma.edificio.delete({
       where: { id_edificio: id },
     });
+    return { message: `Edificio #${id} eliminado exitosamente` };
   }
 }

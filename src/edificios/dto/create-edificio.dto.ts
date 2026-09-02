@@ -1,19 +1,31 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateEdificioDto {
+  @IsNotEmpty({ message: 'El nombre del edificio es obligatorio' })
   @IsString()
-  @IsNotEmpty()
   nombre: string;
 
+  @IsNotEmpty({ message: 'La dirección es obligatoria' })
   @IsString()
-  @IsNotEmpty()
   direccion: string;
 
-  @IsNumber()
   @IsOptional()
+  @IsString()
+  ciudad?: string;
+
+  @IsOptional()
+  @IsString()
+  provincia?: string;
+
+  @IsOptional()
+  @IsString()
+  imagen?: string;
+
+  @IsOptional()
+  @IsNumber()
   total_departamentos?: number;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   estado?: string;
 }
