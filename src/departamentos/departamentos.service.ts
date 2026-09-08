@@ -21,6 +21,16 @@ export class DepartamentosService {
     };
   }
 
+  // Helper para serializar fotos de departamento
+  private formatFoto(foto: any) {
+    if (!foto) return null;
+    return {
+      ...foto,
+      id_departamento_foto: Number(foto.id_departamento_foto),
+      id_departamento: foto.id_departamento ? Number(foto.id_departamento) : null,
+    };
+  }
+
   async create(dto: CreateDepartamentoDto) {
     const departamento = await this.prisma.departamento.create({
       data: {
@@ -103,5 +113,59 @@ export class DepartamentosService {
     });
 
     return { message: `Departamento #${id} eliminado exitosamente` };
+  }
+
+  async guardarFotos(idDepartamento: number, fotosData: { url: string; id_publico: string }[]) {
+    // Validar existencia del departamento
+    await this.findOne(idDepartamento);
+
+    const registros = await Promise.all(
+      fotosData.map(foto =>
+        this.prisma.departamento_foto.create({
+          data: {
+            id_departamento: BigInt(idDepartamento),
+            url: foto.url,
+            id_publico: foto.id_publico,
+            estado: 'ACTIVO',
+          },
+        })
+      )
+    );
+
+    return registros.map(r => this.formatFoto(r));
+  }
+
+  async obtenerFotosPorDepartamento(idDepartamento: number) {
+    const fotos = await this.prisma.departamento_foto.findMany({
+      where: {
+        id_departamento: BigInt(idDepartamento),
+        estado: 'ACTIVO',
+      },
+      orderBy: {
+        id_departamento_foto: 'desc',
+      },
+    });
+
+    return fotos.map(f => this.formatFoto(f));
+  }
+
+  async eliminarFoto(idFoto: number) {
+    const foto = await this.prisma.departamento_foto.findUnique({
+      where: { id_departamento_foto: BigInt(idFoto) },
+    });
+
+    if (!foto) {
+      throw new NotFoundException(`Foto #${idFoto} no encontrada`);
+    }
+
+    const fotoActualizada = await this.prisma.departamento_foto.update({
+      where: { id_departamento_foto: BigInt(idFoto) },
+      data: { 
+        estado: 'INACTIVO',
+        updated_date: new Date(),
+      },
+    });
+
+    return this.formatFoto(fotoActualizada);
   }
 }
