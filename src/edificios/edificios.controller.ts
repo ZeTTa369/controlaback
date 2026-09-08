@@ -14,26 +14,31 @@ import { CreateEdificioDto } from './dto/create-edificio.dto';
 import { UpdateEdificioDto } from './dto/update-edificio.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard)
 @Controller('edificios')
 export class EdificiosController {
   constructor(private readonly edificiosService: EdificiosService) {}
 
-  @Post()
-  create(@Body() createEdificioDto: CreateEdificioDto) {
-    return this.edificiosService.create(createEdificioDto);
-  }
-
+  // PÚBLICO: Para el catálogo de visitantes
   @Get()
   findAll() {
     return this.edificiosService.findAll();
   }
 
+  // PÚBLICO: Para ver el detalle de un edificio
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.edificiosService.findOne(id);
   }
 
+  // PROTEGIDO: Solo usuarios autenticados
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(@Body() createEdificioDto: CreateEdificioDto) {
+    return this.edificiosService.create(createEdificioDto);
+  }
+
+  // PROTEGIDO: Solo usuarios autenticados
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -42,6 +47,8 @@ export class EdificiosController {
     return this.edificiosService.update(id, updateEdificioDto);
   }
 
+  // PROTEGIDO: Solo usuarios autenticados
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.edificiosService.remove(id);
