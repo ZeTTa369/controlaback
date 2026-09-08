@@ -66,6 +66,16 @@ model departamento {
   updated_date        DateTime? @db.Timestamp(6)
 }
 
+model departamento_foto {
+  id_departamento_foto BigInt    @id @default(autoincrement())
+  id_departamento      BigInt?
+  url                  String?   @db.Text
+  id_publico           String?   @db.VarChar(255)
+  estado               String?   @default("ACTIVO") @db.VarChar(15)
+  created_date         DateTime? @default(now()) @db.Timestamp(6)
+  updated_date         DateTime? @db.Timestamp(6)
+}
+
 model edificio {
   id_edificio         Int            @id @default(autoincrement())
   nombre              String?        @db.VarChar(150)
