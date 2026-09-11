@@ -13,6 +13,9 @@ model cobro {
   id_concepto       Int?      @db.SmallInt
   descripcion       String?   @db.VarChar(255)
   monto             Decimal?  @db.Decimal(12, 2)
+  monto_original    Decimal?  @db.Decimal(12, 2)
+  motivo_ajuste     String?   @db.VarChar(255)
+  id_usuario        BigInt?
   moneda            String?   @db.VarChar(3)
   periodo_mes       Int?
   periodo_anio      Int?
