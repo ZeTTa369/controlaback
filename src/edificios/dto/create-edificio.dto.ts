@@ -49,4 +49,8 @@ export class CreateEdificioDto {
   @IsBoolean()
   @Transform(({ value }) => value === 'true' || value === true || value === 1 || value === '1')
   tiene_camaras?: boolean;
+
+  @IsOptional()
+  @IsString()
+  ubicacion_url?: string;
 }
