@@ -23,8 +23,10 @@ async function bootstrap() {
   // Configuración de CORS habilitada para producción (Vercel)
   app.enableCors({
   origin: [
-    'https://controlafront.vercel.app', // Tu dominio exacto de Vercel
-    'http://localhost:5173',            // Para desarrollo local con Vite
+    'https://alquilafacilcbba.com',
+    'https://www.alquilafacilcbba.com',
+    'https://controlafront.vercel.app',
+    'http://localhost:5173',            
     'http://localhost:3000',
   ],
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
