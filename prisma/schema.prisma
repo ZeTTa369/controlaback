@@ -87,11 +87,12 @@ model edificio {
   provincia           String?        @db.VarChar(100)
   imagen              String?
   total_departamentos Int?
-  estado              String?        @db.VarChar(20)
+  estado              String?        @db.VarChar(50)
   tiene_parqueo_moto  Boolean?       @default(false)
   tiene_ascensor      Boolean?       @default(false)
   tiene_conserje      Boolean?       @default(false)
   tiene_camaras       Boolean?       @default(false)
+  ubicacion_url       String?
   created_date        DateTime?      @default(now()) @db.Timestamp(6)
   updated_date        DateTime?      @db.Timestamp(6)
 }

@@ -31,6 +31,11 @@ export class EdificiosService {
       ...edificio,
       ciudad: edificio.ciudad || '',
       provincia: edificio.provincia || '',
+      ubicacion_url: edificio.ubicacion_url || null,
+      tiene_parqueo_moto: Boolean(edificio.tiene_parqueo_moto),
+      tiene_ascensor: Boolean(edificio.tiene_ascensor),
+      tiene_conserje: Boolean(edificio.tiene_conserje),
+      tiene_camaras: Boolean(edificio.tiene_camaras),
       capacidad_declarada: edificio.total_departamentos || 0,
       total_registrados: totalRegistrados,
       disponibles: disponibles,
@@ -50,8 +55,13 @@ export class EdificiosService {
         ciudad: dto.ciudad?.trim() || null,
         provincia: dto.provincia?.trim() || null,
         imagen: dto.imagen || null,
+        ubicacion_url: dto.ubicacion_url?.trim() || null,
         total_departamentos: dto.total_departamentos || 1,
         estado: dto.estado || 'ACTIVO',
+        tiene_parqueo_moto: dto.tiene_parqueo_moto ?? false,
+        tiene_ascensor: dto.tiene_ascensor ?? false,
+        tiene_conserje: dto.tiene_conserje ?? false,
+        tiene_camaras: dto.tiene_camaras ?? false,
       },
     });
 
@@ -98,10 +108,25 @@ export class EdificiosService {
         ...(dto.ciudad !== undefined && { ciudad: dto.ciudad?.trim() || null }),
         ...(dto.provincia !== undefined && { provincia: dto.provincia?.trim() || null }),
         ...(dto.imagen !== undefined && { imagen: dto.imagen }),
+        ...(dto.ubicacion_url !== undefined && {
+          ubicacion_url: dto.ubicacion_url?.trim() || null,
+        }),
         ...(dto.total_departamentos !== undefined && {
           total_departamentos: dto.total_departamentos,
         }),
         ...(dto.estado && { estado: dto.estado }),
+        ...(dto.tiene_parqueo_moto !== undefined && {
+          tiene_parqueo_moto: dto.tiene_parqueo_moto,
+        }),
+        ...(dto.tiene_ascensor !== undefined && {
+          tiene_ascensor: dto.tiene_ascensor,
+        }),
+        ...(dto.tiene_conserje !== undefined && {
+          tiene_conserje: dto.tiene_conserje,
+        }),
+        ...(dto.tiene_camaras !== undefined && {
+          tiene_camaras: dto.tiene_camaras,
+        }),
         updated_date: new Date(),
       },
     });
