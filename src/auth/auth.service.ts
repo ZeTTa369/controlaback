@@ -1,7 +1,14 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { 
+  Injectable, 
+  UnauthorizedException, 
+  BadRequestException, 
+  NotFoundException, 
+  Logger 
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { CambiarPasswordDto, RecuperarPasswordDto, ResetearPasswordAdminDto } from './dto/cambiar-password.dto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -70,4 +77,91 @@ export class AuthService {
       },
     };
   }
+
+  /**
+   * Cambio de contraseña para el propio usuario autenticado
+   */
+  async cambiarPasswordPropia(idUsuario: number, dto: CambiarPasswordDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id_usuario: idUsuario },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    // 1. Validar que la contraseña actual sea la correcta
+    const esValida = await bcrypt.compare(dto.passwordActual, usuario.password || '');
+    if (!esValida) {
+      throw new BadRequestException('La contraseña actual es incorrecta');
+    }
+
+    // 2. Comprobar que no esté intentando poner la misma clave
+    if (dto.passwordActual === dto.passwordNueva) {
+      throw new BadRequestException('La nueva contraseña no puede ser igual a la actual');
+    }
+
+    // 3. Generar nuevo hash y guardar
+    const salt = await bcrypt.genSalt(10);
+    const nuevoHash = await bcrypt.hash(dto.passwordNueva, salt);
+
+    await this.prisma.usuario.update({
+      where: { id_usuario: idUsuario },
+      data: { password: nuevoHash },
+    });
+
+    return { message: 'Contraseña actualizada correctamente' };
+  }
+
+  /**
+   * Reseteo administrativo de contraseña para cualquier usuario
+   */
+  async resetearPasswordAdmin(idUsuarioObjetivo: number, dto: ResetearPasswordAdminDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id_usuario: idUsuarioObjetivo },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario #${idUsuarioObjetivo} no encontrado`);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const nuevoHash = await bcrypt.hash(dto.passwordNueva, salt);
+
+    await this.prisma.usuario.update({
+      where: { id_usuario: idUsuarioObjetivo },
+      data: { password: nuevoHash },
+    });
+
+    return { 
+      message: `Contraseña restablecida exitosamente para el usuario ${usuario.email}` 
+    };
+  }
+
+  async recuperarPasswordPublico(dto: RecuperarPasswordDto) {
+  const emailLimpio = dto.email.trim();
+  
+  const usuario = await this.prisma.usuario.findFirst({
+    where: {
+      email: {
+        equals: emailLimpio,
+        mode: 'insensitive',
+      },
+    },
+  });
+
+  if (!usuario) {
+    throw new NotFoundException('No existe ningún usuario registrado con ese correo');
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const nuevoHash = await bcrypt.hash(dto.passwordNueva, salt);
+
+  await this.prisma.usuario.update({
+    where: { id_usuario: usuario.id_usuario },
+    data: { password: nuevoHash },
+  });
+
+  return { message: 'Contraseña actualizada con éxito' };
+}
 }

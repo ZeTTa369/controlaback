@@ -93,6 +93,7 @@ model edificio {
   tiene_conserje      Boolean?       @default(false)
   tiene_camaras       Boolean?       @default(false)
   ubicacion_url       String?
+  orden               Int?           @default(0)
   created_date        DateTime?      @default(now()) @db.Timestamp(6)
   updated_date        DateTime?      @db.Timestamp(6)
 }
