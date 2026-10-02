@@ -32,6 +32,7 @@ export class EdificiosService {
       ciudad: edificio.ciudad || '',
       provincia: edificio.provincia || '',
       ubicacion_url: edificio.ubicacion_url || null,
+      orden: edificio.orden ?? 0,
       tiene_parqueo_moto: Boolean(edificio.tiene_parqueo_moto),
       tiene_ascensor: Boolean(edificio.tiene_ascensor),
       tiene_conserje: Boolean(edificio.tiene_conserje),
@@ -58,6 +59,7 @@ export class EdificiosService {
         ubicacion_url: dto.ubicacion_url?.trim() || null,
         total_departamentos: dto.total_departamentos || 1,
         estado: dto.estado || 'ACTIVO',
+        orden: dto.orden ?? 0,
         tiene_parqueo_moto: dto.tiene_parqueo_moto ?? false,
         tiene_ascensor: dto.tiene_ascensor ?? false,
         tiene_conserje: dto.tiene_conserje ?? false,
@@ -69,11 +71,14 @@ export class EdificiosService {
   }
 
   /**
-   * Listar todos los edificios con métricas calculadas
+   * Listar todos los edificios ordenados por prioridad y fecha
    */
   async findAll() {
     const edificios = await this.prisma.edificio.findMany({
-      orderBy: { created_date: 'desc' },
+      orderBy: [
+        { orden: 'asc' },
+        { created_date: 'desc' },
+      ],
     });
 
     return Promise.all(edificios.map((ed) => this.getMetricasEdificio(ed)));
@@ -115,6 +120,9 @@ export class EdificiosService {
           total_departamentos: dto.total_departamentos,
         }),
         ...(dto.estado && { estado: dto.estado }),
+        ...(dto.orden !== undefined && {
+          orden: Number(dto.orden) || 0,
+        }),
         ...(dto.tiene_parqueo_moto !== undefined && {
           tiene_parqueo_moto: dto.tiene_parqueo_moto,
         }),

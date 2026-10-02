@@ -53,4 +53,8 @@ export class CreateEdificioDto {
   @IsOptional()
   @IsString()
   ubicacion_url?: string;
+
+  @IsOptional()
+  @IsNumber()
+  orden?: number;
 }
