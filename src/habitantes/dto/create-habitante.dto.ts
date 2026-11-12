@@ -27,6 +27,10 @@ export class CreateHabitanteDto {
 
   @IsOptional()
   @IsString()
+  nacionalidad?: string;
+
+  @IsOptional()
+  @IsString()
   parentesco?: string;
 
   @IsOptional()

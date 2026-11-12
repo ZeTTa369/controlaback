@@ -7,7 +7,7 @@ import { UpdateDepartamentoDto } from './dto/update-departamento.dto';
 export class DepartamentosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Helper para convertir BigInt y Decimal a tipos JSON compatibles
+  // Helper para convertir BigInt y Decimal a tipos JSON compatibles y asegurar valores por defecto
   private formatDepartamento(dep: any) {
     if (!dep) return null;
     return {
@@ -18,6 +18,10 @@ export class DepartamentosService {
       banos: dep.banos ? Number(dep.banos) : 1,
       habitaciones: dep.habitaciones ? Number(dep.habitaciones) : 1,
       piso: dep.piso ? Number(dep.piso) : 1,
+      // Serializacion explicita de numero_llaves con valor por defecto de 1
+      numero_llaves: dep.numero_llaves !== null && dep.numero_llaves !== undefined 
+        ? Number(dep.numero_llaves) 
+        : 1,
     };
   }
 
@@ -31,6 +35,7 @@ export class DepartamentosService {
     };
   }
 
+  // Creacion de unidad con persistencia de numero_llaves
   async create(dto: CreateDepartamentoDto) {
     const departamento = await this.prisma.departamento.create({
       data: {
@@ -44,6 +49,7 @@ export class DepartamentosService {
         estado: dto.estado || 'DISPONIBLE',
         habitaciones: dto.habitaciones !== undefined ? Number(dto.habitaciones) : 1,
         banos: dto.banos !== undefined ? Number(dto.banos) : 1,
+        numero_llaves: dto.numero_llaves !== undefined ? Number(dto.numero_llaves) : 1,
         precio_alquiler: dto.precio_alquiler !== undefined ? Number(dto.precio_alquiler) : 0,
         observaciones: dto.observaciones?.trim() || null,
       },
@@ -52,6 +58,7 @@ export class DepartamentosService {
     return this.formatDepartamento(departamento);
   }
 
+  // Consulta de todas las unidades con filtro opcional por edificio
   async findAll(idEdificio?: number) {
     const where: any = {};
     if (idEdificio) {
@@ -69,6 +76,7 @@ export class DepartamentosService {
     return deptos.map(d => this.formatDepartamento(d));
   }
 
+  // Consulta de un departamento por identificador unico
   async findOne(id: number) {
     const depto = await this.prisma.departamento.findUnique({
       where: { id_departamento: BigInt(id) },
@@ -81,6 +89,7 @@ export class DepartamentosService {
     return this.formatDepartamento(depto);
   }
 
+  // Actualizacion parcial de campos de la unidad
   async update(id: number, dto: UpdateDepartamentoDto) {
     await this.findOne(id);
 
@@ -97,6 +106,7 @@ export class DepartamentosService {
         ...(dto.estado !== undefined && { estado: dto.estado }),
         ...(dto.habitaciones !== undefined && { habitaciones: Number(dto.habitaciones) }),
         ...(dto.banos !== undefined && { banos: Number(dto.banos) }),
+        ...(dto.numero_llaves !== undefined && { numero_llaves: Number(dto.numero_llaves) }),
         ...(dto.precio_alquiler !== undefined && { precio_alquiler: Number(dto.precio_alquiler) }),
         ...(dto.observaciones !== undefined && { observaciones: dto.observaciones?.trim() || null }),
         updated_date: new Date(),
@@ -106,6 +116,7 @@ export class DepartamentosService {
     return this.formatDepartamento(updated);
   }
 
+  // Eliminacion fisica de la unidad
   async remove(id: number) {
     await this.findOne(id);
     await this.prisma.departamento.delete({
@@ -115,8 +126,8 @@ export class DepartamentosService {
     return { message: `Departamento #${id} eliminado exitosamente` };
   }
 
+  // Registro en lote de fotografias asociadas al departamento
   async guardarFotos(idDepartamento: number, fotosData: { url: string; id_publico: string }[]) {
-    // Validar existencia del departamento
     await this.findOne(idDepartamento);
 
     const registros = await Promise.all(
@@ -135,6 +146,7 @@ export class DepartamentosService {
     return registros.map(r => this.formatFoto(r));
   }
 
+  // Obtencion de fotografias activas de una unidad
   async obtenerFotosPorDepartamento(idDepartamento: number) {
     const fotos = await this.prisma.departamento_foto.findMany({
       where: {
@@ -149,6 +161,7 @@ export class DepartamentosService {
     return fotos.map(f => this.formatFoto(f));
   }
 
+  // Desactivacion logica (soft delete) de una fotografia
   async eliminarFoto(idFoto: number) {
     const foto = await this.prisma.departamento_foto.findUnique({
       where: { id_departamento_foto: BigInt(idFoto) },

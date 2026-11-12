@@ -7,6 +7,20 @@ import { Prisma } from '@prisma/client';
 export class ContratosService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Helper para serializar BigInt y Decimal en respuestas JSON
+  private formatContrato(c: any) {
+    if (!c) return null;
+    return {
+      ...c,
+      id_contrato: Number(c.id_contrato),
+      id_departamento: c.id_departamento ? Number(c.id_departamento) : null,
+      id_usuario: c.id_usuario ? Number(c.id_usuario) : null,
+      monto_renta: c.monto_renta ? Number(c.monto_renta) : 0,
+      garantia: c.garantia ? Number(c.garantia) : 0,
+      numero_llaves: c.numero_llaves !== null && c.numero_llaves !== undefined ? Number(c.numero_llaves) : 1,
+    };
+  }
+
   // Parsear 'YYYY-MM-DD' en hora local para evitar desfases UTC
   private parseFechaLocal(fechaStr: string | Date): Date {
     if (fechaStr instanceof Date) return fechaStr;
@@ -18,7 +32,7 @@ export class ContratosService {
     const fInicio = this.parseFechaLocal(dto.fecha_inicio);
     const fFin = this.parseFechaLocal(dto.fecha_fin);
 
-    // 1. Crear el contrato
+    // 1. Crear el contrato con numero_llaves
     const contrato = await this.prisma.contrato.create({
       data: {
         id_departamento: BigInt(dto.id_departamento),
@@ -28,6 +42,7 @@ export class ContratosService {
         monto_renta: new Prisma.Decimal(dto.monto_renta.toString()),
         moneda: dto.moneda || 'BOB',
         garantia: dto.garantia ? new Prisma.Decimal(dto.garantia.toString()) : new Prisma.Decimal('0'),
+        numero_llaves: dto.numero_llaves !== undefined ? Number(dto.numero_llaves) : 1,
         estado: dto.estado || 'ACTIVO',
       },
     });
@@ -38,7 +53,7 @@ export class ContratosService {
       data: { estado: 'OCUPADO' },
     });
 
-    // 3. Generar automáticamente TODOS los cobros multiplicando (meses x conceptos)
+    // 3. Generar automaticamente los cobros
     await this.generarCobrosAutomaticos(
       contrato.id_contrato,
       fInicio,
@@ -48,7 +63,7 @@ export class ContratosService {
       dto.conceptosIds || [1],
     );
 
-    return contrato;
+    return this.formatContrato(contrato);
   }
 
   private async generarCobrosAutomaticos(
@@ -59,14 +74,12 @@ export class ContratosService {
     moneda: string,
     conceptosIds: number[],
   ) {
-    // 1. Obtener la lista completa de información de los conceptos seleccionados desde la BD
     const conceptosInfo = await this.prisma.concepto.findMany({
       where: {
         id_concepto: { in: conceptosIds.map((id) => Number(id)) },
       },
     });
 
-    // Mapa para resolución rápida de nombres
     const mapaConceptos = new Map<number, { nombre: string }>();
     conceptosInfo.forEach((c) => {
       mapaConceptos.set(c.id_concepto, {
@@ -74,7 +87,6 @@ export class ContratosService {
       });
     });
 
-    // 2. Calcular la cantidad exacta de meses entre fecha_inicio y fecha_fin
     let mesesDiferencia =
       (fechaFin.getFullYear() - fechaInicio.getFullYear()) * 12 +
       (fechaFin.getMonth() - fechaInicio.getMonth());
@@ -86,16 +98,13 @@ export class ContratosService {
 
     const cobrosData: Prisma.cobroCreateManyInput[] = [];
 
-    // 3. Iterar mes a mes usando año y mes base del inicio
     for (let i = 0; i < mesesDiferencia; i++) {
       const fechaActual = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + i, 1);
       const mes = fechaActual.getMonth() + 1;
       const anio = fechaActual.getFullYear();
 
-      // Fecha de vencimiento: día 10 de cada mes
       const fechaVencimiento = new Date(anio, mes - 1, 10);
 
-      // 4. MULTIPLICAR: Crear UN cobro individual por cada concepto seleccionado para este mes
       for (const idConcepto of conceptosIds) {
         const idConceptoNum = Number(idConcepto);
         const concepto = mapaConceptos.get(idConceptoNum);
@@ -111,7 +120,7 @@ export class ContratosService {
         cobrosData.push({
           id_contrato,
           id_concepto: idConceptoNum,
-          descripcion: `${nombreConcepto} - Período ${mes}/${anio}`,
+          descripcion: `${nombreConcepto} Periodo ${mes}/${anio}`,
           monto: new Prisma.Decimal(montoFinal.toString()),
           moneda,
           periodo_mes: mes,
@@ -123,16 +132,16 @@ export class ContratosService {
       }
     }
 
-    // 5. Insertar todos los cobros generados de una sola vez
     await this.prisma.cobro.createMany({
       data: cobrosData,
     });
   }
 
   async findAll() {
-    return this.prisma.contrato.findMany({
+    const contratos = await this.prisma.contrato.findMany({
       orderBy: { created_date: 'desc' },
     });
+    return contratos.map(c => this.formatContrato(c));
   }
 
   async findOne(id: number) {
@@ -140,6 +149,6 @@ export class ContratosService {
       where: { id_contrato: BigInt(id) },
     });
     if (!contrato) throw new NotFoundException(`Contrato con ID ${id} no encontrado.`);
-    return contrato;
+    return this.formatContrato(contrato);
   }
 }

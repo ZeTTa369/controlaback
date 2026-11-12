@@ -6,7 +6,6 @@ import { CreateHabitanteDto } from './dto/create-habitante.dto';
 export class HabitantesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Helper para convertir BigInt a Number en las respuestas JSON
   private formatHabitante(hab: any) {
     if (!hab) return null;
     return {
@@ -17,9 +16,6 @@ export class HabitantesService {
     };
   }
 
-  /**
-   * Crear un solo habitante
-   */
   async create(dto: CreateHabitanteDto) {
     const habitante = await this.prisma.habitante.create({
       data: {
@@ -29,6 +25,7 @@ export class HabitantesService {
         primer_apellido: dto.primer_apellido.trim(),
         segundo_apellido: dto.segundo_apellido ? dto.segundo_apellido.trim() : null,
         ci_nit: dto.ci_nit ? dto.ci_nit.trim() : null,
+        nacionalidad: dto.nacionalidad ? dto.nacionalidad.trim() : 'Boliviana',
         parentesco: dto.parentesco || 'Familiar',
         telefono: dto.telefono ? dto.telefono.trim() : null,
         es_titular: dto.es_titular || 'NO',
@@ -39,9 +36,6 @@ export class HabitantesService {
     return this.formatHabitante(habitante);
   }
 
-  /**
-   * Crear múltiples habitantes en lote (para el registro de contrato)
-   */
   async createMany(dtos: CreateHabitanteDto[]) {
     if (!dtos || dtos.length === 0) return { count: 0 };
 
@@ -52,6 +46,7 @@ export class HabitantesService {
       primer_apellido: dto.primer_apellido.trim(),
       segundo_apellido: dto.segundo_apellido ? dto.segundo_apellido.trim() : null,
       ci_nit: dto.ci_nit ? dto.ci_nit.trim() : null,
+      nacionalidad: dto.nacionalidad ? dto.nacionalidad.trim() : 'Boliviana',
       parentesco: dto.parentesco || 'Familiar',
       telefono: dto.telefono ? dto.telefono.trim() : null,
       es_titular: dto.es_titular || 'NO',
@@ -62,12 +57,9 @@ export class HabitantesService {
       data: dataParaInsertar,
     });
 
-    return { count: result.count, message: `${result.count} habitantes registrados con éxito` };
+    return { count: result.count, message: `${result.count} habitantes registrados con exito` };
   }
 
-  /**
-   * Obtener todos los habitantes de un contrato
-   */
   async findByContrato(idContrato: number) {
     const habitantes = await this.prisma.habitante.findMany({
       where: { 
@@ -80,9 +72,6 @@ export class HabitantesService {
     return habitantes.map(h => this.formatHabitante(h));
   }
 
-  /**
-   * Obtener todos los habitantes de un departamento
-   */
   async findByDepartamento(idDepartamento: number) {
     const habitantes = await this.prisma.habitante.findMany({
       where: { 
@@ -95,9 +84,6 @@ export class HabitantesService {
     return habitantes.map(h => this.formatHabitante(h));
   }
 
-  /**
-   * Eliminar o desactivar un habitante
-   */
   async remove(id: number) {
     const habitante = await this.prisma.habitante.findUnique({
       where: { id_habitante: BigInt(id) },
