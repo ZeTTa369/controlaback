@@ -2,7 +2,10 @@ import {
   IsNotEmpty, 
   IsNumber, 
   IsOptional, 
-  IsString 
+  IsString ,
+  IsInt,
+  Min
+
 } from 'class-validator';
 
 export class CreateDepartamentoDto {
@@ -53,4 +56,9 @@ export class CreateDepartamentoDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  @IsOptional()
+  @IsInt({ message: 'El número de llaves debe ser un entero' })
+  @Min(0, { message: 'El número de llaves no puede ser negativo' })
+  numero_llaves?: number;
 }

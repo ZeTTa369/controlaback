@@ -1,4 +1,13 @@
-import { IsArray, IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { 
+  IsArray, 
+  IsDateString, 
+  IsInt, 
+  IsNotEmpty, 
+  IsNumber, 
+  IsOptional, 
+  IsString, 
+  Min 
+} from 'class-validator';
 
 export class CreateContratoDto {
   @IsNumber()
@@ -7,7 +16,7 @@ export class CreateContratoDto {
 
   @IsNumber()
   @IsNotEmpty()
-  id_usuario: number; // Inquilino
+  id_usuario: number;
 
   @IsDateString()
   @IsNotEmpty()
@@ -23,11 +32,16 @@ export class CreateContratoDto {
 
   @IsString()
   @IsNotEmpty()
-  moneda: string; // BOB, USD
+  moneda: string;
 
   @IsNumber()
   @IsOptional()
   garantia?: number;
+
+  @IsOptional()
+  @IsInt({ message: 'El numero de llaves debe ser un entero' })
+  @Min(0, { message: 'El numero de llaves no puede ser negativo' })
+  numero_llaves?: number;
 
   @IsOptional()
   @IsString()
@@ -35,5 +49,5 @@ export class CreateContratoDto {
 
   @IsArray()
   @IsNumber({}, { each: true })
-  conceptosIds: number[]; // Conceptos asociados (Renta, Expensas, Mantenimiento)
+  conceptosIds: number[];
 }
