@@ -52,6 +52,18 @@ model contrato {
   updated_date    DateTime?                 @db.Timestamp(6)
 }
 
+model contrato_documento {
+  id_contrato_documento BigInt    @id @default(autoincrement())
+  id_contrato           BigInt?
+  nombre                String?   @db.VarChar(150) // Ej: "CI Titular", "Contrato Firmado", "Inventario"
+  url                   String?   @db.Text
+  id_publico            String?   @db.VarChar(255)
+  tipo_archivo          String?   @db.VarChar(20)  // "PDF" o "IMAGEN"
+  estado                String?   @default("ACTIVO") @db.VarChar(15)
+  created_date          DateTime? @default(now()) @db.Timestamp(6)
+  updated_date          DateTime? @db.Timestamp(6)
+}
+
 model departamento {
   id_departamento     BigInt    @id @default(autoincrement())
   id_edificio         Int?
