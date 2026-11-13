@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { 
   IsArray, 
   IsDateString, 
@@ -6,8 +7,18 @@ import {
   IsNumber, 
   IsOptional, 
   IsString, 
-  Min 
+  Min, 
+  ValidateNested 
 } from 'class-validator';
+
+export class ConceptoContratoItemDto {
+  @IsNumber()
+  id_concepto: number;
+
+  @IsNumber()
+  @Min(0)
+  monto: number;
+}
 
 export class CreateContratoDto {
   @IsNumber()
@@ -39,8 +50,8 @@ export class CreateContratoDto {
   garantia?: number;
 
   @IsOptional()
-  @IsInt({ message: 'El numero de llaves debe ser un entero' })
-  @Min(0, { message: 'El numero de llaves no puede ser negativo' })
+  @IsInt()
+  @Min(0)
   numero_llaves?: number;
 
   @IsOptional()
@@ -50,4 +61,10 @@ export class CreateContratoDto {
   @IsArray()
   @IsNumber({}, { each: true })
   conceptosIds: number[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConceptoContratoItemDto)
+  conceptosDetalle?: ConceptoContratoItemDto[];
 }
