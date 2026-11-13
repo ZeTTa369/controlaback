@@ -63,14 +63,15 @@ export class ContratosService {
       data: { estado: 'OCUPADO' },
     });
 
-    // 3. Generar automaticamente los cobros
+    // 3. Generar automaticamente los cobros respetando los montos individuales
     await this.generarCobrosAutomaticos(
       contrato.id_contrato,
       fInicio,
       fFin,
       dto.monto_renta,
       dto.moneda || 'BOB',
-      dto.conceptosIds || [1],
+      dto.conceptosIds || [],
+      dto.conceptosDetalle || [],
     );
 
     return this.formatContrato(contrato);
@@ -83,6 +84,7 @@ export class ContratosService {
     montoRenta: number,
     moneda: string,
     conceptosIds: number[],
+    conceptosDetalle: { id_concepto: number; monto: number }[] = [],
   ) {
     const conceptosInfo = await this.prisma.concepto.findMany({
       where: {
@@ -92,9 +94,15 @@ export class ContratosService {
 
     const mapaConceptos = new Map<number, { nombre: string }>();
     conceptosInfo.forEach((c) => {
-      mapaConceptos.set(c.id_concepto, {
+      mapaConceptos.set(Number(c.id_concepto), {
         nombre: c.nombre || 'Concepto',
       });
+    });
+
+    // Mapa con el monto exacto enviado por el frontend para cada concepto
+    const mapaMontosDetalle = new Map<number, number>();
+    conceptosDetalle.forEach((item) => {
+      mapaMontosDetalle.set(Number(item.id_concepto), Number(item.monto));
     });
 
     let mesesDiferencia =
@@ -118,33 +126,43 @@ export class ContratosService {
       for (const idConcepto of conceptosIds) {
         const idConceptoNum = Number(idConcepto);
         const concepto = mapaConceptos.get(idConceptoNum);
-        const nombreConcepto = concepto?.nombre || 'Cobro de Alquiler';
+        const nombreConcepto = concepto?.nombre || 'Cobro';
 
         const esRenta =
           nombreConcepto.toUpperCase().includes('RENTA') ||
           nombreConcepto.toUpperCase().includes('ALQUILER') ||
-          idConceptoNum === 1;
+          nombreConcepto.toUpperCase().includes('CANON');
 
-        const montoFinal = esRenta ? montoRenta : 150;
+        // Prioridad 1: Monto exacto del detalle enviado desde el formulario
+        // Prioridad 2: Fallback si viene sin detalle
+        const montoFinal = mapaMontosDetalle.has(idConceptoNum)
+          ? mapaMontosDetalle.get(idConceptoNum)!
+          : esRenta
+          ? montoRenta
+          : 0;
 
-        cobrosData.push({
-          id_contrato,
-          id_concepto: idConceptoNum,
-          descripcion: `${nombreConcepto} Periodo ${mes}/${anio}`,
-          monto: new Prisma.Decimal(montoFinal.toString()),
-          moneda,
-          periodo_mes: mes,
-          periodo_anio: anio,
-          fecha_emision: fechaActual,
-          fecha_vencimiento: fechaVencimiento,
-          estado: 'PENDIENTE',
-        });
+        if (montoFinal > 0) {
+          cobrosData.push({
+            id_contrato,
+            id_concepto: idConceptoNum,
+            descripcion: `${nombreConcepto} Periodo ${mes}/${anio}`,
+            monto: new Prisma.Decimal(montoFinal.toString()),
+            moneda,
+            periodo_mes: mes,
+            periodo_anio: anio,
+            fecha_emision: fechaActual,
+            fecha_vencimiento: fechaVencimiento,
+            estado: 'PENDIENTE',
+          });
+        }
       }
     }
 
-    await this.prisma.cobro.createMany({
-      data: cobrosData,
-    });
+    if (cobrosData.length > 0) {
+      await this.prisma.cobro.createMany({
+        data: cobrosData,
+      });
+    }
   }
 
   async findAll() {
