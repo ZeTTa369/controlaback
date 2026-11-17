@@ -240,4 +240,46 @@ export class CobrosService {
       estado: c.estado,
     };
   }
+
+  
+  async actualizarMontosLote(
+    items: { id_cobro: number; monto: number; motivo_ajuste?: string }[],
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const resultados = [];
+
+      for (const item of items) {
+        const actual = await tx.cobro.findUnique({
+          where: { id_cobro: BigInt(item.id_cobro) },
+        });
+
+        if (!actual || actual.estado === 'PAGADO') continue;
+
+        const nuevoMonto = new Prisma.Decimal(item.monto);
+        const updated = await tx.cobro.update({
+          where: { id_cobro: BigInt(item.id_cobro) },
+          data: {
+            monto: nuevoMonto,
+            monto_original: actual.monto_original ?? actual.monto,
+            motivo_ajuste: item.motivo_ajuste || 'Ajuste mensual de tarifa',
+            updated_date: new Date(),
+          },
+        });
+
+        resultados.push({
+          ...updated,
+          id_cobro: Number(updated.id_cobro),
+          id_contrato: updated.id_contrato ? Number(updated.id_contrato) : null,
+          id_usuario: updated.id_usuario ? Number(updated.id_usuario) : null,
+          monto: Number(updated.monto),
+          monto_original: updated.monto_original ? Number(updated.monto_original) : null,
+        });
+      }
+
+      return resultados;
+    });
+  }
+
+
+  
 }

@@ -38,6 +38,25 @@ export class ContratosService {
     return new Date(year, month - 1, day || 1);
   }
 
+  // Calculo del dia limite de pago segun regla del multiplo de 5
+  private calcularDiaLimiteFin(fechaInicio: Date): number {
+    const diaInicio = fechaInicio.getDate();
+    const diasEnElMes = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + 1, 0).getDate();
+
+    if (diaInicio >= 30) {
+      return 5;
+    }
+
+    let diaFin = Math.ceil(diaInicio / 5) * 5;
+    if (diaFin === diaInicio) {
+      diaFin = diaInicio + 5;
+    }
+    if (diaFin > diasEnElMes) {
+      diaFin = diasEnElMes;
+    }
+    return diaFin;
+  }
+
   async create(dto: CreateContratoDto) {
     const fInicio = this.parseFechaLocal(dto.fecha_inicio);
     const fFin = this.parseFechaLocal(dto.fecha_fin);
@@ -63,7 +82,7 @@ export class ContratosService {
       data: { estado: 'OCUPADO' },
     });
 
-    // 3. Generar automaticamente los cobros respetando los montos individuales
+    // 3. Generar automaticamente los cobros respetando los montos individuales y dia limite
     await this.generarCobrosAutomaticos(
       contrato.id_contrato,
       fInicio,
@@ -72,6 +91,7 @@ export class ContratosService {
       dto.moneda || 'BOB',
       dto.conceptosIds || [],
       dto.conceptosDetalle || [],
+      dto.dia_limite_fin,
     );
 
     return this.formatContrato(contrato);
@@ -85,6 +105,7 @@ export class ContratosService {
     moneda: string,
     conceptosIds: number[],
     conceptosDetalle: { id_concepto: number; monto: number }[] = [],
+    diaLimiteFin?: number,
   ) {
     const conceptosInfo = await this.prisma.concepto.findMany({
       where: {
@@ -114,6 +135,7 @@ export class ContratosService {
     }
     mesesDiferencia = Math.max(1, mesesDiferencia);
 
+    const diaLimite = diaLimiteFin ? Number(diaLimiteFin) : this.calcularDiaLimiteFin(fechaInicio);
     const cobrosData: Prisma.cobroCreateManyInput[] = [];
 
     for (let i = 0; i < mesesDiferencia; i++) {
@@ -121,7 +143,9 @@ export class ContratosService {
       const mes = fechaActual.getMonth() + 1;
       const anio = fechaActual.getFullYear();
 
-      const fechaVencimiento = new Date(anio, mes - 1, 10);
+      const ultimoDiaMes = new Date(anio, mes, 0).getDate();
+      const diaVencimientoReal = Math.min(diaLimite, ultimoDiaMes);
+      const fechaVencimiento = new Date(anio, mes - 1, diaVencimientoReal);
 
       for (const idConcepto of conceptosIds) {
         const idConceptoNum = Number(idConcepto);
@@ -298,5 +322,4 @@ export class ContratosService {
       fecha_fin: fechaFinReal,
     };
   }
-  
 }

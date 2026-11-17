@@ -91,4 +91,7 @@ export class ContratosController {
   ) {
     return this.contratosService.finalizarContrato(id, fechaFin);
   }
+
+  
+
 }
