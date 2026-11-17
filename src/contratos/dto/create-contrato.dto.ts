@@ -7,6 +7,7 @@ import {
   IsNumber, 
   IsOptional, 
   IsString, 
+  Max, 
   Min, 
   ValidateNested 
 } from 'class-validator';
@@ -53,6 +54,12 @@ export class CreateContratoDto {
   @IsInt()
   @Min(0)
   numero_llaves?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  dia_limite_fin?: number;
 
   @IsOptional()
   @IsString()
