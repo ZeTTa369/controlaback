@@ -67,6 +67,7 @@ model contrato_documento {
 model departamento {
   id_departamento     BigInt    @id @default(autoincrement())
   id_edificio         Int?
+  codigo              String?   @unique @db.VarChar(30)
   numero_departamento String?   @db.VarChar(30)
   bloque              String?   @db.VarChar(30)
   medidor_agua        String?   @db.VarChar(20)
