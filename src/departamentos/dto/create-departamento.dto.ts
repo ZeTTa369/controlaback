@@ -61,4 +61,8 @@ export class CreateDepartamentoDto {
   @IsInt({ message: 'El número de llaves debe ser un entero' })
   @Min(0, { message: 'El número de llaves no puede ser negativo' })
   numero_llaves?: number;
+
+  @IsOptional()
+  @IsString()
+  codigo?: string;
 }

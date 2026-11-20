@@ -9,7 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFiles,
-  Patch
+  Patch,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ContratosService } from './contratos.service';
@@ -30,6 +30,22 @@ export class ContratosController {
     return this.contratosService.create(createContratoDto);
   }
 
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    body: {
+      fecha_inicio?: string;
+      fecha_fin?: string;
+      monto_renta?: number;
+      garantia?: number;
+      numero_llaves?: number;
+      estado?: string;
+    },
+  ) {
+    return this.contratosService.update(id, body);
+  }
+
   @Get()
   findAll() {
     return this.contratosService.findAll();
@@ -38,6 +54,11 @@ export class ContratosController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.contratosService.findOne(id);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.contratosService.remove(id);
   }
 
   // ================= ENDPOINTS DE DOCUMENTOS (PDF / IMAGENES) =================
@@ -91,7 +112,4 @@ export class ContratosController {
   ) {
     return this.contratosService.finalizarContrato(id, fechaFin);
   }
-
-  
-
 }

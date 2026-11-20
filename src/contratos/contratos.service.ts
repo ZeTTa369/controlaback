@@ -97,6 +97,57 @@ export class ContratosService {
     return this.formatContrato(contrato);
   }
 
+  async update(
+    idContrato: number,
+    dto: {
+      fecha_inicio?: string;
+      fecha_fin?: string;
+      monto_renta?: number;
+      garantia?: number;
+      numero_llaves?: number;
+      estado?: string;
+    },
+  ) {
+    const existente = await this.prisma.contrato.findUnique({
+      where: { id_contrato: BigInt(idContrato) },
+    });
+
+    if (!existente) {
+      throw new NotFoundException(`Contrato con ID ${idContrato} no encontrado.`);
+    }
+
+    const actualizado = await this.prisma.contrato.update({
+      where: { id_contrato: BigInt(idContrato) },
+      data: {
+        ...(dto.fecha_inicio ? { fecha_inicio: this.parseFechaLocal(dto.fecha_inicio) } : {}),
+        ...(dto.fecha_fin ? { fecha_fin: this.parseFechaLocal(dto.fecha_fin) } : {}),
+        ...(dto.monto_renta !== undefined
+          ? { monto_renta: new Prisma.Decimal(dto.monto_renta.toString()) }
+          : {}),
+        ...(dto.garantia !== undefined
+          ? { garantia: new Prisma.Decimal(dto.garantia.toString()) }
+          : {}),
+        ...(dto.numero_llaves !== undefined ? { numero_llaves: Number(dto.numero_llaves) } : {}),
+        ...(dto.estado ? { estado: dto.estado } : {}),
+        updated_date: new Date(),
+      },
+    });
+
+    // Si se marca como FINALIZADO o CANCELADO, liberar el departamento
+    if (
+      dto.estado &&
+      ['FINALIZADO', 'CANCELADO'].includes(dto.estado.toUpperCase()) &&
+      existente.id_departamento
+    ) {
+      await this.prisma.departamento.update({
+        where: { id_departamento: existente.id_departamento },
+        data: { estado: 'DISPONIBLE', updated_date: new Date() },
+      });
+    }
+
+    return this.formatContrato(actualizado);
+  }
+
   private async generarCobrosAutomaticos(
     id_contrato: bigint,
     fechaInicio: Date,
@@ -202,6 +253,66 @@ export class ContratosService {
     });
     if (!contrato) throw new NotFoundException(`Contrato con ID ${id} no encontrado.`);
     return this.formatContrato(contrato);
+  }
+
+  // Eliminar contrato y limpiar todos sus registros dependientes
+  async remove(idContrato: number) {
+    const contrato = await this.prisma.contrato.findUnique({
+      where: { id_contrato: BigInt(idContrato) },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException(`Contrato con ID ${idContrato} no encontrado.`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Obtener IDs de cobros del contrato para limpiar pagos asociados si existen
+      const cobros = await tx.cobro.findMany({
+        where: { id_contrato: BigInt(idContrato) },
+        select: { id_cobro: true },
+      });
+      const idsCobros = cobros.map((c) => c.id_cobro);
+
+      if (idsCobros.length > 0) {
+        await tx.pago.deleteMany({
+          where: { id_cobro: { in: idsCobros } },
+        });
+      }
+
+      // 2. Eliminar cobros, habitantes y documentos vinculados al contrato
+      await tx.cobro.deleteMany({
+        where: { id_contrato: BigInt(idContrato) },
+      });
+
+      await tx.habitante.deleteMany({
+        where: { id_contrato: BigInt(idContrato) },
+      });
+
+      await tx.contrato_documento.deleteMany({
+        where: { id_contrato: BigInt(idContrato) },
+      });
+
+      // 3. Liberar el departamento a DISPONIBLE
+      if (contrato.id_departamento) {
+        await tx.departamento.update({
+          where: { id_departamento: contrato.id_departamento },
+          data: {
+            estado: 'DISPONIBLE',
+            updated_date: new Date(),
+          },
+        });
+      }
+
+      // 4. Eliminar el contrato
+      await tx.contrato.delete({
+        where: { id_contrato: BigInt(idContrato) },
+      });
+    });
+
+    return {
+      message: 'Contrato y registros asociados eliminados correctamente',
+      id_contrato: Number(idContrato),
+    };
   }
 
   // ================= GESTION DE DOCUMENTOS DE RESPALDO =================
@@ -312,6 +423,18 @@ export class ContratosService {
               periodo_mes: { gt: mesCorte },
             },
           ],
+        },
+      });
+
+      // 4. Desactivar habitantes censados del contrato finalizado
+      await tx.habitante.updateMany({
+        where: {
+          id_contrato: BigInt(idContrato),
+          estado: 'ACTIVO',
+        },
+        data: {
+          estado: 'INACTIVO',
+          updated_date: new Date(),
         },
       });
     });

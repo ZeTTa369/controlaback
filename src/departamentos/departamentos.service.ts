@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDepartamentoDto } from './dto/create-departamento.dto';
 import { UpdateDepartamentoDto } from './dto/update-departamento.dto';
+import { generarCodigoDepartamento } from './utils/codigo-departamento.utils';
 
 @Injectable()
 export class DepartamentosService {
@@ -14,14 +15,15 @@ export class DepartamentosService {
       ...dep,
       id_departamento: Number(dep.id_departamento),
       id_edificio: dep.id_edificio ? Number(dep.id_edificio) : null,
+      codigo: dep.codigo || null,
       precio_alquiler: dep.precio_alquiler ? Number(dep.precio_alquiler) : 0,
       banos: dep.banos ? Number(dep.banos) : 1,
       habitaciones: dep.habitaciones ? Number(dep.habitaciones) : 1,
       piso: dep.piso ? Number(dep.piso) : 1,
-      // Serializacion explicita de numero_llaves con valor por defecto de 1
-      numero_llaves: dep.numero_llaves !== null && dep.numero_llaves !== undefined 
-        ? Number(dep.numero_llaves) 
-        : 1,
+      numero_llaves:
+        dep.numero_llaves !== null && dep.numero_llaves !== undefined
+          ? Number(dep.numero_llaves)
+          : 1,
     };
   }
 
@@ -35,14 +37,46 @@ export class DepartamentosService {
     };
   }
 
-  // Creacion de unidad con persistencia de numero_llaves
+  // Creacion de unidad con generacion y validacion de codigo unico
   async create(dto: CreateDepartamentoDto) {
+    const idEdificioNum = dto.id_edificio ? Number(dto.id_edificio) : null;
+    const pisoNum = dto.piso !== undefined ? Number(dto.piso) : 1;
+    const numeroLimpio = dto.numero_departamento.trim();
+    const bloqueLimpio = dto.bloque || null;
+
+    // 1. Consultar el edificio para extraer su inicial oficial
+    const edificio = idEdificioNum
+      ? await this.prisma.edificio.findUnique({
+          where: { id_edificio: idEdificioNum },
+        })
+      : null;
+
+    const codigoGenerado = generarCodigoDepartamento({
+      nombreEdificio: edificio?.nombre,
+      piso: pisoNum,
+      numeroDepartamento: numeroLimpio,
+      bloque: bloqueLimpio,
+    });
+
+    // 2. Verificar que el codigo no este duplicado en la base de datos
+    const existente = await this.prisma.departamento.findFirst({
+      where: { codigo: codigoGenerado },
+    });
+
+    if (existente) {
+      throw new ConflictException(
+        `Ya existe una unidad registrada con el código "${codigoGenerado}" (Edificio, piso, número y bloque duplicados).`,
+      );
+    }
+
+    // 3. Persistir departamento con codigo unico
     const departamento = await this.prisma.departamento.create({
       data: {
-        id_edificio: dto.id_edificio ? Number(dto.id_edificio) : null,
-        piso: dto.piso !== undefined ? Number(dto.piso) : 1,
-        numero_departamento: dto.numero_departamento.trim(),
-        bloque: dto.bloque || null,
+        id_edificio: idEdificioNum,
+        codigo: codigoGenerado,
+        piso: pisoNum,
+        numero_departamento: numeroLimpio,
+        bloque: bloqueLimpio,
         medidor_agua: dto.medidor_agua || 'NO_TIENE',
         medidor_luz: dto.medidor_luz || 'NO_TIENE',
         tipo_inmueble: dto.tipo_inmueble || 'DEPARTAMENTO',
@@ -67,13 +101,10 @@ export class DepartamentosService {
 
     const deptos = await this.prisma.departamento.findMany({
       where,
-      orderBy: [
-        { piso: 'asc' },
-        { numero_departamento: 'asc' },
-      ],
+      orderBy: [{ piso: 'asc' }, { numero_departamento: 'asc' }],
     });
 
-    return deptos.map(d => this.formatDepartamento(d));
+    return deptos.map((d) => this.formatDepartamento(d));
   }
 
   // Consulta de un departamento por identificador unico
@@ -89,16 +120,52 @@ export class DepartamentosService {
     return this.formatDepartamento(depto);
   }
 
-  // Actualizacion parcial de campos de la unidad
+  // Actualizacion parcial de campos de la unidad validando unicidad de codigo
   async update(id: number, dto: UpdateDepartamentoDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
+
+    const idEdificioFinal =
+      dto.id_edificio !== undefined ? Number(dto.id_edificio) : actual.id_edificio;
+    const pisoFinal = dto.piso !== undefined ? Number(dto.piso) : actual.piso;
+    const numeroFinal = dto.numero_departamento
+      ? dto.numero_departamento.trim()
+      : actual.numero_departamento;
+    const bloqueFinal = dto.bloque !== undefined ? dto.bloque : actual.bloque;
+
+    const edificio = idEdificioFinal
+      ? await this.prisma.edificio.findUnique({
+          where: { id_edificio: idEdificioFinal },
+        })
+      : null;
+
+    const codigoNuevo = generarCodigoDepartamento({
+      nombreEdificio: edificio?.nombre,
+      piso: pisoFinal,
+      numeroDepartamento: numeroFinal,
+      bloque: bloqueFinal,
+    });
+
+    // Verificar que otra unidad distinta no tenga ya ese mismo codigo
+    const duplicado = await this.prisma.departamento.findFirst({
+      where: {
+        codigo: codigoNuevo,
+        id_departamento: { not: BigInt(id) },
+      },
+    });
+
+    if (duplicado) {
+      throw new ConflictException(
+        `No se puede guardar: el código "${codigoNuevo}" ya pertenece a otra unidad registrada.`,
+      );
+    }
 
     const updated = await this.prisma.departamento.update({
       where: { id_departamento: BigInt(id) },
       data: {
         ...(dto.id_edificio !== undefined && { id_edificio: Number(dto.id_edificio) }),
+        codigo: codigoNuevo,
         ...(dto.piso !== undefined && { piso: Number(dto.piso) }),
-        ...(dto.numero_departamento && { numero_departamento: dto.numero_departamento.trim() }),
+        ...(dto.numero_departamento && { numero_departamento: numeroFinal }),
         ...(dto.bloque !== undefined && { bloque: dto.bloque }),
         ...(dto.medidor_agua !== undefined && { medidor_agua: dto.medidor_agua }),
         ...(dto.medidor_luz !== undefined && { medidor_luz: dto.medidor_luz }),
@@ -108,7 +175,9 @@ export class DepartamentosService {
         ...(dto.banos !== undefined && { banos: Number(dto.banos) }),
         ...(dto.numero_llaves !== undefined && { numero_llaves: Number(dto.numero_llaves) }),
         ...(dto.precio_alquiler !== undefined && { precio_alquiler: Number(dto.precio_alquiler) }),
-        ...(dto.observaciones !== undefined && { observaciones: dto.observaciones?.trim() || null }),
+        ...(dto.observaciones !== undefined && {
+          observaciones: dto.observaciones?.trim() || null,
+        }),
         updated_date: new Date(),
       },
     });
@@ -131,7 +200,7 @@ export class DepartamentosService {
     await this.findOne(idDepartamento);
 
     const registros = await Promise.all(
-      fotosData.map(foto =>
+      fotosData.map((foto) =>
         this.prisma.departamento_foto.create({
           data: {
             id_departamento: BigInt(idDepartamento),
@@ -139,11 +208,11 @@ export class DepartamentosService {
             id_publico: foto.id_publico,
             estado: 'ACTIVO',
           },
-        })
-      )
+        }),
+      ),
     );
 
-    return registros.map(r => this.formatFoto(r));
+    return registros.map((r) => this.formatFoto(r));
   }
 
   // Obtencion de fotografias activas de una unidad
@@ -158,7 +227,7 @@ export class DepartamentosService {
       },
     });
 
-    return fotos.map(f => this.formatFoto(f));
+    return fotos.map((f) => this.formatFoto(f));
   }
 
   // Desactivacion logica (soft delete) de una fotografia
@@ -173,7 +242,7 @@ export class DepartamentosService {
 
     const fotoActualizada = await this.prisma.departamento_foto.update({
       where: { id_departamento_foto: BigInt(idFoto) },
-      data: { 
+      data: {
         estado: 'INACTIVO',
         updated_date: new Date(),
       },
