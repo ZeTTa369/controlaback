@@ -8,7 +8,7 @@ export class ContratosService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Helper para serializar BigInt y Decimal en respuestas JSON
-  private formatContrato(c: any) {
+  private formatContrato(c: any, habitantes: any[] = []) {
     if (!c) return null;
     return {
       ...c,
@@ -18,6 +18,17 @@ export class ContratosService {
       monto_renta: c.monto_renta ? Number(c.monto_renta) : 0,
       garantia: c.garantia ? Number(c.garantia) : 0,
       numero_llaves: c.numero_llaves !== null && c.numero_llaves !== undefined ? Number(c.numero_llaves) : 1,
+      habitantes: habitantes.map((h) => this.formatHabitante(h)),
+    };
+  }
+
+  private formatHabitante(h: any) {
+    if (!h) return null;
+    return {
+      ...h,
+      id_habitante: Number(h.id_habitante),
+      id_contrato: h.id_contrato ? Number(h.id_contrato) : null,
+      id_departamento: h.id_departamento ? Number(h.id_departamento) : null,
     };
   }
 
@@ -31,14 +42,12 @@ export class ContratosService {
     };
   }
 
-  // Parsear 'YYYY-MM-DD' en hora local para evitar desfases UTC
   private parseFechaLocal(fechaStr: string | Date): Date {
     if (fechaStr instanceof Date) return fechaStr;
     const [year, month, day] = fechaStr.split('-').map(Number);
     return new Date(year, month - 1, day || 1);
   }
 
-  // Calculo del dia limite de pago segun regla del multiplo de 5
   private calcularDiaLimiteFin(fechaInicio: Date): number {
     const diaInicio = fechaInicio.getDate();
     const diasEnElMes = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + 1, 0).getDate();
@@ -76,13 +85,39 @@ export class ContratosService {
       },
     });
 
-    // 2. Marcar departamento como OCUPADO
+    // 2. Guardar habitantes/ocupantes censados si vienen en el DTO
+    let habitantesCreados: any[] = [];
+    if (Array.isArray(dto.habitantes) && dto.habitantes.length > 0) {
+      const habitantesData = dto.habitantes.map((h) => ({
+        id_contrato: contrato.id_contrato,
+        id_departamento: BigInt(dto.id_departamento),
+        nombres: (h.nombres || h.nombre || '').trim() || null,
+        primer_apellido: (h.primer_apellido || '').trim() || null,
+        segundo_apellido: (h.segundo_apellido || '').trim() || null,
+        ci_nit: (h.ci_nit || h.ci || '').trim() || null,
+        parentesco: (h.parentesco || '').trim() || null,
+        telefono: (h.telefono || '').trim() || null,
+        es_titular: h.es_titular || 'NO',
+        nacionalidad: (h.nacionalidad || 'Boliviana').trim(),
+        estado: 'ACTIVO',
+      }));
+
+      await this.prisma.habitante.createMany({
+        data: habitantesData,
+      });
+
+      habitantesCreados = await this.prisma.habitante.findMany({
+        where: { id_contrato: contrato.id_contrato, estado: 'ACTIVO' },
+      });
+    }
+
+    // 3. Marcar departamento como OCUPADO
     await this.prisma.departamento.update({
       where: { id_departamento: BigInt(dto.id_departamento) },
       data: { estado: 'OCUPADO' },
     });
 
-    // 3. Generar automaticamente los cobros respetando los montos individuales y dia limite
+    // 4. Generar automaticamente los cobros respetando los montos individuales y dia limite
     await this.generarCobrosAutomaticos(
       contrato.id_contrato,
       fInicio,
@@ -94,7 +129,7 @@ export class ContratosService {
       dto.dia_limite_fin,
     );
 
-    return this.formatContrato(contrato);
+    return this.formatContrato(contrato, habitantesCreados);
   }
 
   async update(
@@ -133,7 +168,6 @@ export class ContratosService {
       },
     });
 
-    // Si se marca como FINALIZADO o CANCELADO, liberar el departamento
     if (
       dto.estado &&
       ['FINALIZADO', 'CANCELADO'].includes(dto.estado.toUpperCase()) &&
@@ -171,7 +205,6 @@ export class ContratosService {
       });
     });
 
-    // Mapa con el monto exacto enviado por el frontend para cada concepto
     const mapaMontosDetalle = new Map<number, number>();
     conceptosDetalle.forEach((item) => {
       mapaMontosDetalle.set(Number(item.id_concepto), Number(item.monto));
@@ -208,8 +241,6 @@ export class ContratosService {
           nombreConcepto.toUpperCase().includes('ALQUILER') ||
           nombreConcepto.toUpperCase().includes('CANON');
 
-        // Prioridad 1: Monto exacto del detalle enviado desde el formulario
-        // Prioridad 2: Fallback si viene sin detalle
         const montoFinal = mapaMontosDetalle.has(idConceptoNum)
           ? mapaMontosDetalle.get(idConceptoNum)!
           : esRenta
@@ -244,7 +275,29 @@ export class ContratosService {
     const contratos = await this.prisma.contrato.findMany({
       orderBy: { created_date: 'desc' },
     });
-    return contratos.map((c) => this.formatContrato(c));
+
+    if (contratos.length === 0) return [];
+
+    const idsContratos = contratos.map((c) => c.id_contrato);
+    const habitantes = await this.prisma.habitante.findMany({
+      where: {
+        id_contrato: { in: idsContratos },
+        estado: 'ACTIVO',
+      },
+      orderBy: { id_habitante: 'asc' },
+    });
+
+    const habMap = new Map<string, any[]>();
+    for (const h of habitantes) {
+      if (!h.id_contrato) continue;
+      const key = h.id_contrato.toString();
+      if (!habMap.has(key)) habMap.set(key, []);
+      habMap.get(key)!.push(h);
+    }
+
+    return contratos.map((c) =>
+      this.formatContrato(c, habMap.get(c.id_contrato.toString()) || []),
+    );
   }
 
   async findOne(id: number) {
@@ -252,10 +305,36 @@ export class ContratosService {
       where: { id_contrato: BigInt(id) },
     });
     if (!contrato) throw new NotFoundException(`Contrato con ID ${id} no encontrado.`);
-    return this.formatContrato(contrato);
+
+    const habitantes = await this.prisma.habitante.findMany({
+      where: { id_contrato: BigInt(id), estado: 'ACTIVO' },
+      orderBy: { id_habitante: 'asc' },
+    });
+
+    return this.formatContrato(contrato, habitantes);
   }
 
-  // Eliminar contrato y limpiar todos sus registros dependientes
+  async obtenerHabitantesPorContrato(idContrato: number) {
+    const habitantes = await this.prisma.habitante.findMany({
+      where: {
+        id_contrato: BigInt(idContrato),
+        estado: 'ACTIVO',
+      },
+      orderBy: { id_habitante: 'asc' },
+    });
+
+    return habitantes.map((h) => this.formatHabitante(h));
+  }
+
+  async obtenerTodosHabitantes() {
+    const habitantes = await this.prisma.habitante.findMany({
+      where: { estado: 'ACTIVO' },
+      orderBy: { id_habitante: 'asc' },
+    });
+
+    return habitantes.map((h) => this.formatHabitante(h));
+  }
+
   async remove(idContrato: number) {
     const contrato = await this.prisma.contrato.findUnique({
       where: { id_contrato: BigInt(idContrato) },
@@ -266,7 +345,6 @@ export class ContratosService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. Obtener IDs de cobros del contrato para limpiar pagos asociados si existen
       const cobros = await tx.cobro.findMany({
         where: { id_contrato: BigInt(idContrato) },
         select: { id_cobro: true },
@@ -279,7 +357,6 @@ export class ContratosService {
         });
       }
 
-      // 2. Eliminar cobros, habitantes y documentos vinculados al contrato
       await tx.cobro.deleteMany({
         where: { id_contrato: BigInt(idContrato) },
       });
@@ -292,7 +369,6 @@ export class ContratosService {
         where: { id_contrato: BigInt(idContrato) },
       });
 
-      // 3. Liberar el departamento a DISPONIBLE
       if (contrato.id_departamento) {
         await tx.departamento.update({
           where: { id_departamento: contrato.id_departamento },
@@ -303,7 +379,6 @@ export class ContratosService {
         });
       }
 
-      // 4. Eliminar el contrato
       await tx.contrato.delete({
         where: { id_contrato: BigInt(idContrato) },
       });
@@ -375,7 +450,6 @@ export class ContratosService {
     return this.formatDocumento(docActualizado);
   }
 
-  // Finalizar contrato anticipadamente, liberar unidad y depurar cuotas futuras
   async finalizarContrato(idContrato: number, fechaFinStr: string) {
     const contrato = await this.prisma.contrato.findUnique({
       where: { id_contrato: BigInt(idContrato) },
@@ -390,7 +464,6 @@ export class ContratosService {
     const mesCorte = fechaFinReal.getMonth() + 1;
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. Actualizar estado y fecha_fin real del contrato
       await tx.contrato.update({
         where: { id_contrato: BigInt(idContrato) },
         data: {
@@ -400,7 +473,6 @@ export class ContratosService {
         },
       });
 
-      // 2. Liberar el departamento a DISPONIBLE
       if (contrato.id_departamento) {
         await tx.departamento.update({
           where: { id_departamento: contrato.id_departamento },
@@ -411,7 +483,6 @@ export class ContratosService {
         });
       }
 
-      // 3. Eliminar cobros PENDIENTES posteriores al mes/anio de finalizacion
       await tx.cobro.deleteMany({
         where: {
           id_contrato: BigInt(idContrato),
@@ -426,7 +497,6 @@ export class ContratosService {
         },
       });
 
-      // 4. Desactivar habitantes censados del contrato finalizado
       await tx.habitante.updateMany({
         where: {
           id_contrato: BigInt(idContrato),
@@ -445,4 +515,97 @@ export class ContratosService {
       fecha_fin: fechaFinReal,
     };
   }
+
+  async agregarHabitanteAContrato(idContrato: number, dto: any) {
+    const contrato = await this.prisma.contrato.findUnique({
+      where: { id_contrato: BigInt(idContrato) },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException(`Contrato con ID ${idContrato} no encontrado.`);
+    }
+
+    const nuevo = await this.prisma.habitante.create({
+      data: {
+        id_contrato: BigInt(idContrato),
+        id_departamento: contrato.id_departamento,
+        nombres: (dto.nombres || dto.nombre || '').trim() || null,
+        primer_apellido: (dto.primer_apellido || '').trim() || null,
+        segundo_apellido: (dto.segundo_apellido || '').trim() || null,
+        ci_nit: (dto.ci_nit || dto.ci || '').trim() || null,
+        parentesco: (dto.parentesco || 'Familiar').trim(),
+        telefono: (dto.telefono || '').trim() || null,
+        es_titular: dto.es_titular || 'NO',
+        nacionalidad: (dto.nacionalidad || 'Boliviana').trim(),
+        estado: 'ACTIVO',
+      },
+    });
+
+    return this.formatHabitante(nuevo);
+  }
+
+  async actualizarHabitante(idHabitante: number, dto: any) {
+    const existente = await this.prisma.habitante.findUnique({
+      where: { id_habitante: BigInt(idHabitante) },
+    });
+
+    if (!existente) {
+      throw new NotFoundException(`Habitante #${idHabitante} no encontrado.`);
+    }
+
+    const actualizado = await this.prisma.habitante.update({
+      where: { id_habitante: BigInt(idHabitante) },
+      data: {
+        ...(dto.nombres !== undefined || dto.nombre !== undefined
+          ? { nombres: (dto.nombres || dto.nombre || '').trim() || null }
+          : {}),
+        ...(dto.primer_apellido !== undefined
+          ? { primer_apellido: (dto.primer_apellido || '').trim() || null }
+          : {}),
+        ...(dto.segundo_apellido !== undefined
+          ? { segundo_apellido: (dto.segundo_apellido || '').trim() || null }
+          : {}),
+        ...(dto.ci_nit !== undefined || dto.ci !== undefined
+          ? { ci_nit: (dto.ci_nit || dto.ci || '').trim() || null }
+          : {}),
+        ...(dto.parentesco !== undefined
+          ? { parentesco: (dto.parentesco || '').trim() || null }
+          : {}),
+        ...(dto.telefono !== undefined
+          ? { telefono: (dto.telefono || '').trim() || null }
+          : {}),
+        ...(dto.nacionalidad !== undefined
+          ? { nacionalidad: (dto.nacionalidad || 'Boliviana').trim() }
+          : {}),
+        ...(dto.es_titular !== undefined ? { es_titular: dto.es_titular } : {}),
+        updated_date: new Date(),
+      },
+    });
+
+    return this.formatHabitante(actualizado);
+  }
+
+  async eliminarHabitante(idHabitante: number) {
+    const existente = await this.prisma.habitante.findUnique({
+      where: { id_habitante: BigInt(idHabitante) },
+    });
+
+    if (!existente) {
+      throw new NotFoundException(`Habitante #${idHabitante} no encontrado.`);
+    }
+
+    await this.prisma.habitante.update({
+      where: { id_habitante: BigInt(idHabitante) },
+      data: {
+        estado: 'INACTIVO',
+        updated_date: new Date(),
+      },
+    });
+
+    return {
+      message: 'Habitante dado de baja correctamente',
+      id_habitante: Number(idHabitante),
+    };
+  }
+
 }

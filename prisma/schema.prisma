@@ -21,6 +21,7 @@ model cobro {
   periodo_anio      Int?
   fecha_emision     DateTime? @db.Date
   fecha_vencimiento DateTime? @db.Date
+  numero_recibo     String?   @db.VarChar(40)
   estado            String?   @db.VarChar(15)
   created_date      DateTime? @default(now()) @db.Timestamp(6)
   updated_date      DateTime? @db.Time(6)

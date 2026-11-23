@@ -42,9 +42,16 @@ export class CobrosController {
   @Roles(1, 2, 3)
   registrarPago(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { monto: number; metodo_pago: string; comprobante?: string },
+    @Body()
+    body: {
+      monto: number;
+      metodo_pago: string;
+      comprobante?: string;
+      nuevo_monto?: number;
+      motivo_ajuste?: string;
+    },
   ) {
-    return this.cobrosService.registrarPago(id, body.monto, body.metodo_pago, body.comprobante);
+    return this.cobrosService.registrarPago(id, body);
   }
 
   @Post('subir-recibo-pdf')

@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ContratosService } from './contratos.service';
-import { CreateContratoDto } from './dto/create-contrato.dto';
+import { CreateContratoDto, HabitanteContratoItemDto } from './dto/create-contrato.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from '../upload/upload.service';
 
@@ -51,9 +51,42 @@ export class ContratosController {
     return this.contratosService.findAll();
   }
 
+  @Get('habitantes/todos')
+  obtenerTodosHabitantes() {
+    return this.contratosService.obtenerTodosHabitantes();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.contratosService.findOne(id);
+  }
+
+  // ================= ENDPOINTS DE HABITANTES / OCUPANTES =================
+
+  @Get(':id/habitantes')
+  obtenerHabitantes(@Param('id', ParseIntPipe) id: number) {
+    return this.contratosService.obtenerHabitantesPorContrato(id);
+  }
+
+  @Post(':id/habitantes')
+  agregarHabitante(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: HabitanteContratoItemDto,
+  ) {
+    return this.contratosService.agregarHabitanteAContrato(id, body);
+  }
+
+  @Patch('habitantes/:idHabitante')
+  actualizarHabitante(
+    @Param('idHabitante', ParseIntPipe) idHabitante: number,
+    @Body() body: HabitanteContratoItemDto,
+  ) {
+    return this.contratosService.actualizarHabitante(idHabitante, body);
+  }
+
+  @Delete('habitantes/:idHabitante')
+  eliminarHabitante(@Param('idHabitante', ParseIntPipe) idHabitante: number) {
+    return this.contratosService.eliminarHabitante(idHabitante);
   }
 
   @Delete(':id')
@@ -77,7 +110,6 @@ export class ContratosController {
   ) {
     const archivosSubidos = await this.uploadService.uploadMultipleFiles(files, 'contratos');
 
-    // Parsear las etiquetas enviadas desde el frontend
     let nombresList: string[] = [];
     if (Array.isArray(nombresRaw)) {
       nombresList = nombresRaw;

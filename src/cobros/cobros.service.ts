@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { generarCodigoDepartamento } from '../departamentos/utils/codigo-departamento.utils';
 
 export interface RegistrarPagoParams {
   monto: number;
@@ -27,6 +28,7 @@ const COBRO_SELECT_FIELDS = {
   fecha_emision: true,
   fecha_vencimiento: true,
   estado: true,
+  numero_recibo: true,
   created_date: true,
   updated_date: true,
 };
@@ -117,6 +119,114 @@ export class CobrosService {
     };
   }
 
+  /**
+   * Genera u obtiene el numero de recibo correlativo por edificio y anio.
+   * Formato: [Codigo Unidad][Correlativo 4 digitos] -> Ej. L11SB0001 / CC25I0001.
+   * Se reinicia automaticamente a 0001 cada inicio de anio por cada edificio.
+   */
+  private async obtenerOGenerarNumeroRecibo(cobro: any): Promise<string | null> {
+    if (cobro.numero_recibo) {
+      return cobro.numero_recibo;
+    }
+
+    if (!cobro.id_contrato) return null;
+
+    // 1. Verificar si ya existe un numero_recibo asignado en otro concepto del mismo periodo
+    if (cobro.periodo_mes && cobro.periodo_anio) {
+      const otroCobroDelPeriodo = await this.prisma.cobro.findFirst({
+        where: {
+          id_contrato: cobro.id_contrato,
+          periodo_mes: cobro.periodo_mes,
+          periodo_anio: cobro.periodo_anio,
+          numero_recibo: { not: null },
+        },
+        select: { numero_recibo: true },
+      });
+
+      if (otroCobroDelPeriodo?.numero_recibo) {
+        return otroCobroDelPeriodo.numero_recibo;
+      }
+    }
+
+    // 2. Obtener contrato -> departamento -> edificio
+    const contrato = await this.prisma.contrato.findUnique({
+      where: { id_contrato: cobro.id_contrato },
+    });
+
+    if (!contrato?.id_departamento) return null;
+
+    const depto = await this.prisma.departamento.findUnique({
+      where: { id_departamento: contrato.id_departamento },
+    });
+
+    if (!depto) return null;
+
+    const edificio = depto.id_edificio
+      ? await this.prisma.edificio.findUnique({
+          where: { id_edificio: depto.id_edificio },
+        })
+      : null;
+
+    const codigoUnidad =
+      depto.codigo ||
+      generarCodigoDepartamento({
+        nombreEdificio: edificio?.nombre,
+        piso: depto.piso,
+        numeroDepartamento: depto.numero_departamento,
+        bloque: depto.bloque,
+      });
+
+    // 3. Buscar todos los departamentos y contratos de ese mismo edificio para contar recibos del anio
+    const anioActual = new Date().getFullYear();
+    const inicioAnio = new Date(anioActual, 0, 1);
+    const finAnio = new Date(anioActual + 1, 0, 1);
+
+    let maxCorrelativoEdificio = 0;
+
+    if (depto.id_edificio) {
+      const deptosEdificio = await this.prisma.departamento.findMany({
+        where: { id_edificio: depto.id_edificio },
+        select: { id_departamento: true },
+      });
+      const idsDeptos = deptosEdificio.map((d) => d.id_departamento);
+
+      const contratosEdificio = await this.prisma.contrato.findMany({
+        where: { id_departamento: { in: idsDeptos } },
+        select: { id_contrato: true },
+      });
+      const idsContratos = contratosEdificio.map((c) => c.id_contrato);
+
+      if (idsContratos.length > 0) {
+        // Recibos emitidos en este edificio durante el anio en curso
+        const cobrosConRecibo = await this.prisma.cobro.findMany({
+          where: {
+            id_contrato: { in: idsContratos },
+            numero_recibo: { not: null },
+            updated_date: {
+              gte: inicioAnio,
+              lt: finAnio,
+            },
+          },
+          select: { numero_recibo: true },
+        });
+
+        for (const item of cobrosConRecibo) {
+          if (!item.numero_recibo) continue;
+          const match = item.numero_recibo.match(/(\d{4})$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxCorrelativoEdificio) {
+              maxCorrelativoEdificio = num;
+            }
+          }
+        }
+      }
+    }
+
+    const siguienteCorrelativo = String(maxCorrelativoEdificio + 1).padStart(4, '0');
+    return `${codigoUnidad}${siguienteCorrelativo}`;
+  }
+
   async registrarPago(
     idCobro: number, 
     montoOPagoDto: number | RegistrarPagoParams, 
@@ -202,15 +312,37 @@ export class CobrosService {
     const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto_pagado || 0), 0);
     const estadoFinal = totalPagado >= nuevoMontoFinal ? 'PAGADO' : 'PENDIENTE';
 
+    // 4. Si queda PAGADO, obtener o generar el numero de recibo correlativo por edificio y anio
+    let numeroReciboFinal = cobro.numero_recibo || null;
+    if (estadoFinal === 'PAGADO') {
+      numeroReciboFinal = await this.obtenerOGenerarNumeroRecibo(cobro);
+    }
+
     const cobroActualizado = await this.prisma.cobro.update({
       where: { id_cobro: idBigInt },
       data: { 
-        estado: estadoFinal, 
+        estado: estadoFinal,
+        ...(numeroReciboFinal ? { numero_recibo: numeroReciboFinal } : {}),
         updated_date: new Date(),
         id_usuario: idUsuario ? BigInt(idUsuario) : cobro.id_usuario,
       },
       select: COBRO_SELECT_FIELDS,
     });
+
+    // Propagar el mismo numero_recibo al resto de conceptos del mismo periodo mensual
+    if (numeroReciboFinal && cobro.id_contrato && cobro.periodo_mes && cobro.periodo_anio) {
+      await this.prisma.cobro.updateMany({
+        where: {
+          id_contrato: cobro.id_contrato,
+          periodo_mes: cobro.periodo_mes,
+          periodo_anio: cobro.periodo_anio,
+          numero_recibo: null,
+        },
+        data: {
+          numero_recibo: numeroReciboFinal,
+        },
+      });
+    }
 
     return {
       pago: nuevoPago,
@@ -238,10 +370,10 @@ export class CobrosService {
       fecha_emision: c.fecha_emision,
       fecha_vencimiento: c.fecha_vencimiento,
       estado: c.estado,
+      numero_recibo: c.numero_recibo || null,
     };
   }
 
-  
   async actualizarMontosLote(
     items: { id_cobro: number; monto: number; motivo_ajuste?: string }[],
   ) {
@@ -279,7 +411,4 @@ export class CobrosService {
       return resultados;
     });
   }
-
-
-  
 }
