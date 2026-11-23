@@ -21,6 +21,48 @@ export class ConceptoContratoItemDto {
   monto: number;
 }
 
+export class HabitanteContratoItemDto {
+  @IsOptional()
+  @IsString()
+  nombres?: string;
+
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  primer_apellido?: string;
+
+  @IsOptional()
+  @IsString()
+  segundo_apellido?: string;
+
+  @IsOptional()
+  @IsString()
+  ci_nit?: string;
+
+  @IsOptional()
+  @IsString()
+  ci?: string;
+
+  @IsOptional()
+  @IsString()
+  parentesco?: string;
+
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @IsOptional()
+  @IsString()
+  es_titular?: string;
+
+  @IsOptional()
+  @IsString()
+  nacionalidad?: string;
+}
+
 export class CreateContratoDto {
   @IsNumber()
   @IsNotEmpty()
@@ -74,4 +116,10 @@ export class CreateContratoDto {
   @ValidateNested({ each: true })
   @Type(() => ConceptoContratoItemDto)
   conceptosDetalle?: ConceptoContratoItemDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HabitanteContratoItemDto)
+  habitantes?: HabitanteContratoItemDto[];
 }

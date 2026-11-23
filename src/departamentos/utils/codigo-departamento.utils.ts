@@ -1,13 +1,31 @@
+function obtenerPrefijoEdificio(nombreEdificio = ''): string {
+  const limpio = String(nombreEdificio || '')
+    .trim()
+    .replace(/^(EDIFICIO|TORRE)\s+/i, '');
+
+  if (!limpio) return 'X';
+
+  const conectores = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y']);
+  const palabras = limpio
+    .split(/\s+/)
+    .filter((p) => p && !conectores.has(p.toUpperCase()));
+
+  if (palabras.length === 0) return 'X';
+
+  if (palabras.length === 1) {
+    return palabras[0].charAt(0).toUpperCase();
+  }
+
+  return palabras.map((p) => p.charAt(0).toUpperCase()).join('');
+}
+
 export function generarCodigoDepartamento(params: {
   nombreEdificio?: string | null;
   piso?: number | null;
   numeroDepartamento?: string | null;
   bloque?: string | null;
 }): string {
-  const nombreLimpio = String(params.nombreEdificio || '')
-    .trim()
-    .replace(/^(EDIFICIO|CONDOMINIO|TORRE)\s+/i, '');
-  const inicialEdificio = nombreLimpio.charAt(0).toUpperCase() || 'X';
+  const prefijoEdificio = obtenerPrefijoEdificio(params.nombreEdificio || '');
 
   const pisoStr =
     params.piso !== null && params.piso !== undefined && String(params.piso).trim() !== ''
@@ -38,5 +56,5 @@ export function generarCodigoDepartamento(params: {
     bloqueStr = bloqueLimpio.charAt(0);
   }
 
-  return `${inicialEdificio}${pisoStr}${deptoStr}${bloqueStr}`;
+  return `${prefijoEdificio}${pisoStr}${deptoStr}${bloqueStr}`;
 }
