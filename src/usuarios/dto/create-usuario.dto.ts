@@ -17,6 +17,10 @@ export class CreateUsuarioDto {
   @IsNotEmpty()
   ci_nit: string;
 
+  @IsOptional()
+  @IsString()
+  nacionalidad?: string;
+
   @IsEmail()
   @IsNotEmpty()
   email: string;
