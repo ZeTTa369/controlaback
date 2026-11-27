@@ -126,6 +126,7 @@ model habitante {
   telefono         String?   @db.VarChar(30)
   es_titular       String?   @default("NO") @db.VarChar(15)
   nacionalidad     String?   @db.VarChar(30) 
+  observaciones    String?   @db.VarChar(255)
   estado           String?   @default("ACTIVO") @db.VarChar(15)
   created_date     DateTime? @default(now()) @db.Timestamp(6)
   updated_date     DateTime? @db.Timestamp(6)
