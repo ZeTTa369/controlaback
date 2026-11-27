@@ -17,11 +17,13 @@ export class ContratosService {
       id_usuario: c.id_usuario ? Number(c.id_usuario) : null,
       monto_renta: c.monto_renta ? Number(c.monto_renta) : 0,
       garantia: c.garantia ? Number(c.garantia) : 0,
-      numero_llaves: c.numero_llaves !== null && c.numero_llaves !== undefined ? Number(c.numero_llaves) : 1,
+      numero_llaves:
+        c.numero_llaves !== null && c.numero_llaves !== undefined
+          ? Number(c.numero_llaves)
+          : 1,
       habitantes: habitantes.map((h) => this.formatHabitante(h)),
     };
   }
-
 
   private formatHabitante(h: any) {
     if (!h) return null;
@@ -52,7 +54,11 @@ export class ContratosService {
 
   private calcularDiaLimiteFin(fechaInicio: Date): number {
     const diaInicio = fechaInicio.getDate();
-    const diasEnElMes = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + 1, 0).getDate();
+    const diasEnElMes = new Date(
+      fechaInicio.getFullYear(),
+      fechaInicio.getMonth() + 1,
+      0,
+    ).getDate();
 
     if (diaInicio >= 30) {
       return 5;
@@ -81,8 +87,11 @@ export class ContratosService {
         fecha_fin: fFin,
         monto_renta: new Prisma.Decimal(dto.monto_renta.toString()),
         moneda: dto.moneda || 'BOB',
-        garantia: dto.garantia ? new Prisma.Decimal(dto.garantia.toString()) : new Prisma.Decimal('0'),
-        numero_llaves: dto.numero_llaves !== undefined ? Number(dto.numero_llaves) : 1,
+        garantia: dto.garantia
+          ? new Prisma.Decimal(dto.garantia.toString())
+          : new Prisma.Decimal('0'),
+        numero_llaves:
+          dto.numero_llaves !== undefined ? Number(dto.numero_llaves) : 1,
         estado: dto.estado || 'ACTIVO',
       },
     });
@@ -101,6 +110,7 @@ export class ContratosService {
         telefono: (h.telefono || '').trim() || null,
         es_titular: h.es_titular || 'NO',
         nacionalidad: (h.nacionalidad || 'Boliviana').trim(),
+        observaciones: (h.observaciones || '').trim() || null,
         estado: 'ACTIVO',
       }));
 
@@ -156,15 +166,21 @@ export class ContratosService {
     const actualizado = await this.prisma.contrato.update({
       where: { id_contrato: BigInt(idContrato) },
       data: {
-        ...(dto.fecha_inicio ? { fecha_inicio: this.parseFechaLocal(dto.fecha_inicio) } : {}),
-        ...(dto.fecha_fin ? { fecha_fin: this.parseFechaLocal(dto.fecha_fin) } : {}),
+        ...(dto.fecha_inicio
+          ? { fecha_inicio: this.parseFechaLocal(dto.fecha_inicio) }
+          : {}),
+        ...(dto.fecha_fin
+          ? { fecha_fin: this.parseFechaLocal(dto.fecha_fin) }
+          : {}),
         ...(dto.monto_renta !== undefined
           ? { monto_renta: new Prisma.Decimal(dto.monto_renta.toString()) }
           : {}),
         ...(dto.garantia !== undefined
           ? { garantia: new Prisma.Decimal(dto.garantia.toString()) }
           : {}),
-        ...(dto.numero_llaves !== undefined ? { numero_llaves: Number(dto.numero_llaves) } : {}),
+        ...(dto.numero_llaves !== undefined
+          ? { numero_llaves: Number(dto.numero_llaves) }
+          : {}),
         ...(dto.estado ? { estado: dto.estado } : {}),
         updated_date: new Date(),
       },
@@ -221,11 +237,17 @@ export class ContratosService {
     }
     mesesDiferencia = Math.max(1, mesesDiferencia);
 
-    const diaLimite = diaLimiteFin ? Number(diaLimiteFin) : this.calcularDiaLimiteFin(fechaInicio);
+    const diaLimite = diaLimiteFin
+      ? Number(diaLimiteFin)
+      : this.calcularDiaLimiteFin(fechaInicio);
     const cobrosData: Prisma.cobroCreateManyInput[] = [];
 
     for (let i = 0; i < mesesDiferencia; i++) {
-      const fechaActual = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + i, 1);
+      const fechaActual = new Date(
+        fechaInicio.getFullYear(),
+        fechaInicio.getMonth() + i,
+        1,
+      );
       const mes = fechaActual.getMonth() + 1;
       const anio = fechaActual.getFullYear();
 
@@ -306,7 +328,8 @@ export class ContratosService {
     const contrato = await this.prisma.contrato.findUnique({
       where: { id_contrato: BigInt(id) },
     });
-    if (!contrato) throw new NotFoundException(`Contrato con ID ${id} no encontrado.`);
+    if (!contrato)
+      throw new NotFoundException(`Contrato con ID ${id} no encontrado.`);
 
     const habitantes = await this.prisma.habitante.findMany({
       where: { id_contrato: BigInt(id), estado: 'ACTIVO' },
@@ -396,7 +419,12 @@ export class ContratosService {
 
   async guardarDocumentos(
     idContrato: number,
-    docsData: { url: string; id_publico: string; nombre: string; tipo_archivo: string }[],
+    docsData: {
+      url: string;
+      id_publico: string;
+      nombre: string;
+      tipo_archivo: string;
+    }[],
   ) {
     await this.findOne(idContrato);
 
@@ -512,7 +540,8 @@ export class ContratosService {
     });
 
     return {
-      message: 'Contrato finalizado, unidad liberada y cuotas futuras depuradas correctamente',
+      message:
+        'Contrato finalizado, unidad liberada y cuotas futuras depuradas correctamente',
       id_contrato: Number(idContrato),
       fecha_fin: fechaFinReal,
     };
@@ -581,10 +610,10 @@ export class ContratosService {
           ? { nacionalidad: (dto.nacionalidad || 'Boliviana').trim() }
           : {}),
         ...(dto.es_titular !== undefined ? { es_titular: dto.es_titular } : {}),
-        updated_date: new Date(),
         ...(dto.observaciones !== undefined
-          ? { observaciones: (dto.observaciones || '').trim() }
+          ? { observaciones: (dto.observaciones || '').trim() || null }
           : {}),
+        updated_date: new Date(),
       },
     });
 
@@ -613,5 +642,5 @@ export class ContratosService {
       id_habitante: Number(idHabitante),
     };
   }
-
+  
 }

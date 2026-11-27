@@ -44,4 +44,8 @@ export class CreateHabitanteDto {
   @IsOptional()
   @IsString()
   estado?: string;
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

@@ -61,6 +61,10 @@ export class HabitanteContratoItemDto {
   @IsOptional()
   @IsString()
   nacionalidad?: string;
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }
 
 export class CreateContratoDto {
