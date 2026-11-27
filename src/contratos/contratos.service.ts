@@ -22,6 +22,7 @@ export class ContratosService {
     };
   }
 
+
   private formatHabitante(h: any) {
     if (!h) return null;
     return {
@@ -29,6 +30,7 @@ export class ContratosService {
       id_habitante: Number(h.id_habitante),
       id_contrato: h.id_contrato ? Number(h.id_contrato) : null,
       id_departamento: h.id_departamento ? Number(h.id_departamento) : null,
+      observaciones: h.observaciones || '',
     };
   }
 
@@ -537,6 +539,7 @@ export class ContratosService {
         telefono: (dto.telefono || '').trim() || null,
         es_titular: dto.es_titular || 'NO',
         nacionalidad: (dto.nacionalidad || 'Boliviana').trim(),
+        observaciones: (dto.observaciones || '').trim() || null,
         estado: 'ACTIVO',
       },
     });
@@ -579,6 +582,9 @@ export class ContratosService {
           : {}),
         ...(dto.es_titular !== undefined ? { es_titular: dto.es_titular } : {}),
         updated_date: new Date(),
+        ...(dto.observaciones !== undefined
+          ? { observaciones: (dto.observaciones || '').trim() }
+          : {}),
       },
     });
 

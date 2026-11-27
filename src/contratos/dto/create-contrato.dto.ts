@@ -122,4 +122,8 @@ export class CreateContratoDto {
   @ValidateNested({ each: true })
   @Type(() => HabitanteContratoItemDto)
   habitantes?: HabitanteContratoItemDto[];
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }
